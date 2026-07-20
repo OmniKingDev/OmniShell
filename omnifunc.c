@@ -256,6 +256,8 @@ static char *omnish_prompt_path(const char *current_dir)
     if (components > 5) {
         int remaining = 3;
 
+        // Remove All Folder Names That Aren't The Last 3 Directories
+        // If Current Directory Exceeds 5 Directories
         position = current_dir + strlen(current_dir);
         while (position > current_dir) {
             position--;
