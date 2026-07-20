@@ -38,3 +38,30 @@
         - omnifunc.h
           -> Create any functions the omnish function relies only
           -> Anything that could be stretch to other future programs
+
+
+                          --- 17 JULY, 2026. OmniKing ---
+                            OMNISHELL FOUNDATION FILES
+    """ Structure Shell Files """
+  Using Codex to Re-structure Shell Files
+
+  1. Continuing From 15 July:
+      Building more scripts (omnifunc.c, omnibuiltins.h, omnibuiltins.c)
+      ----------------------------------------------------------------
+        - omnifunc.c
+          -> Holds Shell Loop, Input Reading, Token Parsing, Command Execution, External-Program Launching, Current-Directory Retrieval, And Prompt-Path Formatting
+        - omnibuiltins.c
+          -> Holds Private Builtin Command/Function Tables, Builtin Dispatch, And Completed Builtin Implementations Such As cd, help, exit, And pwd
+        - omnibuiltins.h
+          -> Declares Public Builtin Functions Used By The Rest Of OmniShell
+
+
+                          --- 18 JULY, 2026. OmniKing ---
+                            RESEARCHING NEXT OMNISHELL BUILTIN
+    """ Plan Today's OmniShell Work """
+
+  1. Research additional builtin commands normally expected from a shell.
+  2. Choose and begin the next OmniShell builtin.
+  3. Continue testing pwd and the shortened current-directory prompt.
+  4. Plan the explicit omnirun <file> builtin for Python, C, and C++.
+  5. Keep automatic file recognition as later work after omnirun is reliable.

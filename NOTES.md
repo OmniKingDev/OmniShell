@@ -50,4 +50,20 @@
     I told myself since that enjoyment of overcoming a learning curve felt powerful and slightly addicting to me LOL. Now I want to keep throwing those hurdles at myself since the impact it grants you afterwards is way more valuable than AI giving me an answer. But I do plan on using AI for this project, in order to teach myself how I can get AI to work for how I like to learn and program.
     Using Chatgpt has been my source, mainly for research but struggling to get the information needed to understand, not just an answer to my problem. Teaching gpt how I learn and to not take it away has been working, especially after spending the $20 for the pro version eventhough I am far from exceeding my token limit, it's for the fact I like to send screenshot instead of text, those images per context window are limited, so this Pro allows "unlimited" files I can send.
 
-                            --- 16 JULY, 2026. OmniKing ---
+
+                            --- 18 JULY, 2026. OmniKing ---
+
+                                PERSONAL THOUGHTS
+  Having taken a couple days to look over the article by Stephen Brennan. I can confidently say that I understand what the base foundations of what a shell is, and how it is supposed to operate in normal daily use. Learning a lot from the fundamentals of a shell has given me the idea that I believe solves a problem that I deal with and other developers might as well.
+ Looking back from when I started learning how to program for the first time, which was taking this course. When programming different languages, you have to remember all these sequence of commands just to launch/run a program. Noticing the name 'omni', I thought, why not just let the shell determine what missing requirements are missing from trying to run/launch a program like C, Python, C++, HTML files, and more!
+
+  So that is the goal for this project that I believe solves a problem that would inspire me to turn this project into a real project, this is the time I am really taking to learn how to read documentation and write the code myself based on what I read and research, still learning how to program mentally. Using AI here and there to just clean up some errors I miss and also asking if I have used a function improperly. That to me is enough use of AI while I am still a student to this new field I am entering.
+
+  Currently using chatgpt to talk about the architecture and how to implement my vision into my shell, today I have finished reading the article researching in-between to fully grasp the teachings the article offered. Now have built a shell of my own using the skeleton code the article provided.
+
+                                WHAT IS A SHELL
+  What is a shell?
+      A shell is a program that allows the user to command the operating system. By using a child process, you can run another program inside a program like a shell which is the parent process. The child would run the command that the operating system provided. You can also write builtin commands that allow the user to not rely on the operating system to have said program.
+
+
+                            --- 19 JULY, 2026. OmniKing ---
