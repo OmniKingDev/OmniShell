@@ -232,6 +232,10 @@ char *omnish_cwd(void)
     return buff;
 }
 
+/*
+* AI Written Function 'omnish_prompt_path'
+* Developer Written Comments Of Function
+*/
 // Shorten Current Working Directory For Prompt
 static char *omnish_prompt_path(const char *current_dir)
 {
