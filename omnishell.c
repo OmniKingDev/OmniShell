@@ -1,13 +1,14 @@
-#include "omnishell.h"
+#include "omnifunc.h"
 #include <stdlib.h>
 
-int main(int argc, char **argv) {
+int main(void) {
+
     // Config Files If Any
 
     /*
      * - Run Command Loop
      */
-
+    // Main Shell Function
     omnish();
 
     // Perform Any Shutdown/Cleanup on shell function

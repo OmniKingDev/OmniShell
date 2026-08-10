@@ -12,12 +12,14 @@
 #include <sys/wait.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 // Defining Delimeters
 #define OMNI_TOK_DELIM " \t\r\n\a"
 
 void omnish(void);
-char *omnish_read_line(void);
+char *omnish_read_line(const char *prompt);
 char *omnish_cwd(void);
 char **omnish_split_line(char *line);
 int omnish_launch_program(char **tokens);

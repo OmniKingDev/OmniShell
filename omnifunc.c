@@ -2,44 +2,80 @@
 
 // Main Shell Functions (REPL)
 #include "omnifunc.h"
+#include "omnishell.h"
 
 // Shell Builtins Header File
 #include "omnibuiltins.h"
 
-// Prototype
+// Prototypes
 static char *omnish_prompt_path(const char *current_dir);
+static void omnish_init_readline(void);
+static void omnish_print_banner(void);
 
-// Single Function Used In omnishell.c To Launch Shell
+// Used In omnishell.c To Launch Shell
 void omnish(void)
 {
     // Set Variables To Take In Arguments
+    // For Functions Later Used To Readline
+    // Displaying Current Directory User Is In
     char *line;
     char **argv;
     char *current_dir;
     char *display_dir;
     int status;
 
+    // Initialize Keybinds Readline Provides
+    omnish_init_readline();
+    omnish_print_banner();
+
     // Start Loop
     do {
         current_dir = omnish_cwd();
+        // Just In-case 'omnish_cwd' Returns Nothing
         if (!current_dir) {
             return;
         }
 
+        // Returns Shorter Version Of Current Working Directory Path
+        // ONLY If Path Exceeds Set Limit For Directories Shown
         display_dir = omnish_prompt_path(current_dir);
         if (!display_dir) {
             free(current_dir);
             return;
         }
 
-        // All Made Functions Are In Header File
+        /* NOTE:
+         *  All 'omni*' Made Functions Are Declared In Header File 'omnifunc.h'
+         *  EXCEPT For Any Function With A 'static' Type Remains In This File
+         */
+
         // Prompt User
-        printf("%s\n😈omnishell ==⇒ ", display_dir);
+        char *omnish_prompt = "\n\001" OMNI_BRPINK "\002omnishellv0.1\001" OMNI_RESET "\002 ==> ";
+        size_t prompt_size = strlen(display_dir) + strlen(omnish_prompt) + 1;
+
+        char *prompt = malloc(prompt_size);
+
+        if (!prompt) {
+            free(display_dir);
+            free(current_dir);
+            return;
+        }
+
+        // Final Prompt User Sees
+        snprintf(prompt, prompt_size, "%s%s", display_dir, omnish_prompt);
+
+        // Free Memory After Use
         free(display_dir);
         free(current_dir);
 
-        // Grab Input From Terminal Console(Standard Input)
-        line = omnish_read_line(); // --> UPDATE W/ 'getline' Function
+        // Then Hand Prompt To Use In 'readline' Function
+        line = omnish_read_line(prompt);
+        free(prompt);
+        // If 'omnish_read_line' Returns NULL
+        // Close Shell Loop
+        if (!line) {
+            break;
+        }
 
         // Then Parse Line To Separate Commands
         argv = omnish_split_line(line);
@@ -54,48 +90,71 @@ void omnish(void)
     } while (status);
 }
 
-/* All Functions OmniShell Utilizes */
+/* NOTE: All Functions OmniShell Utilizes */
+
+// Read Line Initialization
+static void omnish_init_readline(void)
+{
+    // Call Readline's Default Keybinds
+    // Creating Readline To Be Interactive
+    rl_initialize();
+}
+
+static void omnish_print_banner(void)
+{
+    printf(
+OMNI_BRPINK
+" ▒█████   ███▄ ▄███▓ ███▄    █  ██▓  ██████  ██░ ██ ▓█████  ██▓     ██▓    \n"
+"▒██▒  ██▒▓██▒▀█▀ ██▒ ██ ▀█   █ ▓██▒▒██    ▒ ▓██░ ██▒▓█   ▀ ▓██▒    ▓██▒    \n"
+"▒██░  ██▒▓██    ▓██░▓██  ▀█ ██▒▒██▒░ ▓██▄   ▒██▀▀██░▒███   ▒██░    ▒██░    \n"
+"▒██   ██░▒██    ▒██ ▓██▒  ▐▌██▒░██░  ▒   ██▒░▓█ ░██ ▒▓█  ▄ ▒██░    ▒██░    \n"
+"░ ████▓▒░▒██▒   ░██▒▒██░   ▓██░░██░▒██████▒▒░▓█▒░██▓░▒████▒░██████▒░██████▒\n"
+"░ ▒░▒░▒░ ░ ▒░   ░  ░░ ▒░   ▒ ▒ ░▓  ▒ ▒▓▒ ▒ ░ ▒ ░░▒░▒░░ ▒░ ░░ ▒░▓  ░░ ▒░▓  ░\n"
+"  ░ ▒ ▒░ ░  ░      ░░ ░░   ░ ▒░ ▒ ░░ ░▒  ░ ░ ▒ ░▒░ ░ ░ ░  ░░ ░ ▒  ░░ ░ ▒  ░\n"
+"░ ░ ░ ▒  ░      ░      ░   ░ ░  ▒ ░░  ░  ░   ░  ░░ ░   ░     ░ ░     ░ ░   \n"
+"    ░ ░         ░            ░  ░        ░   ░  ░  ░   ░  ░    ░  ░    ░  ░\n"
+OMNI_BRPURPLE
+"                         OmniShell v0.1                                    \n"
+"             Welcome To The First Version Of OmniShell!!!                  \n"
+OMNI_RESET);
+}
 
 // Read From Stdin function
-char *omnish_read_line(void)
+char *omnish_read_line(const char *prompt)
 {
     /* Get Line To Parse */
+    static char *line = NULL;
 
-    // Malloc Memory For Line
-    char *line = NULL;
-
-    // Buffer Type Set
-    // 'size_t' Unsigned Integer
-    size_t buffer = 0;
-
-    // Get Line From Stream Using 'getline'
-    // 'ssize_t' Signed Integer In-Case Of Error
-    ssize_t command = getline(&line, &buffer, stdin);
-
-    // If 'getline' Failed
-    if (command == -1) {
-        free(line);
-        fprintf(stderr, "omnish: Function \'getline\' failed\n");
+    // Get Line Read
+    /*  NOTE: --> 'readline' Specifically Waits For User To Input A Command
+     *              Even If Input Is An Empty Strings
+     */
+    line = readline(prompt);
+    if (!line) {
         return NULL;
     }
 
-    // Return If 'getline' Was Successful
+    // Return If 'readline' Was Successful And Not An Empty String
+    if (line && *line) {
+        add_history(line);
+        omnish_store_line(line);
+    }
     return line;
 }
-
 
 // Function Tokenizing Line (Parsing)
 char **omnish_split_line(char *line) {
     /* Parse Line Given Into Separate Tokens */
 
     // 'position' And 'bufsiz' Are Both Integers
-    int bufsiz = OMNI_TOK_BUFSIZ, position = 0;
+    int bufsiz = OMNI_TOK_BUFSIZ;
+    int position = 0;
 
     // Malloc For Each Token
     char **tokens = malloc(sizeof(char *) * bufsiz);
     char *token;
     if (!tokens) {
-        fprintf(stderr, "omnish: 01 Malloc Failed To Allocate Memory");
+        fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed To Allocate Memory\n" OMNI_RESET);
         exit(EXIT_FAILURE);
     }
 
@@ -106,40 +165,42 @@ char **omnish_split_line(char *line) {
         position++;
 
         // Increase Tokens Size With More Pointers To SET Buffer
+        // ONLY If 'position' Exceeds 'bufsiz'
         if (position >= bufsiz) {
             bufsiz += OMNI_TOK_BUFSIZ;
-            // Re-Allocate To Add 64 More Pointers To Strings
             char **new_tokens;
 
             new_tokens = realloc(tokens, bufsiz * sizeof(char *));
             if (!new_tokens) {
-                fprintf(stderr, "omnish: 02 Malloc Failed To Re-Allocate Memory");
+                fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed To Re-Allocate Memory\n" OMNI_RESET);
                 free(tokens);
                 exit(EXIT_FAILURE);
             }
             tokens = new_tokens;
         }
-        // 'strtok' Must Be Called Twice In-order To Continue Parsing Same Line
-        // Setting Pointer To NULL Tells 'strtok' To Use 'line'
-        // Continuing From Where It Left Off
+        // 'strtok' Must Be Called Twice In-order To Continue Parsing Same 'line'
+        // Setting Pointer To NULL Tells 'strtok' To Use 'line'; Utilizing Hidden Pointers
+        // Setting the Pointer To NULL; NOT 'line' Itself
+        // Loops Back To First Call To 'strtok' Grabbing Next Token In 'line'
         token = strtok(NULL, OMNI_TOK_DELIM);
     }
     // Terminate Then Return List With NULL At The End
+    // 'execvp' Expects 'tokens' Array To End With NULL
     tokens[position] = NULL;
     return tokens;
 }
 
-
 // Execute Each Token Function
 int omnish_launch_program(char **tokens)
 {
-    // Declare Two Integers Capable Of Holding a PID
-    pid_t pid, wpid;
+    // Declare 'pid' Capable Of Holding a PID
+    pid_t pid;
+    pid_t wpid;
     // Declare Status For 'waitpid' Function
     int status;
 
-    // 'fork' Creates Child Process
-    // Child Returns 0 If Successful
+    // 'fork' Creates A Child Process Within Parent Process
+    // Child Return Value Is 0 As Type 'pid_t' If Successful
     pid = fork();
     if (pid == 0) {
         // 'execvp' Gets Tokens Previously Parsed Then Executes
@@ -148,24 +209,25 @@ int omnish_launch_program(char **tokens)
         // 'p' Is For PATH (OS finds program path through $PATH)
         if (execvp(tokens[0], tokens) == -1) {
             // Prints Error Given By The Library or Function
-            // That Caused Error During Execution
             // Allowing User To Be Guided To Source Problem
             // Giving Main Function Name
             perror("omnish");
+            // '_exit' The Child's Original Process Image (Copy Of Shell Program(Parent Process))
+            // NOT The Shell Program(Parent) The Child Was Created In
+            _exit(EXIT_FAILURE);
         }
-        // Exit To Keep Shell Running After Printing Error
-        exit(EXIT_FAILURE);
     } else if (pid < 0) {
-        // If Creating Child Process Failes
-        // Keep Going After Printing Error
-        // Let User Decide IF They Want To Terminate Program
         perror("omnish");
     } else {
-        // Process Id Of Child Process
+        // Results Of Child Process
         // 'WUNTRACED' Return If A Child Stopped
-        // Parent Waits For Child Process To Stop
+        // Parent Waits For Child Process To Change State
         do {
             wpid = waitpid(pid, &status, WUNTRACED);
+            if (wpid == -1) {
+                perror("waitpid");
+                return -1;
+            }
         // Loop While Status Doesn't Signify A Properly
         // Exited Or Signaled Terminated Child Process
         } while (!WIFEXITED(status) && !WIFSIGNALED(status));
@@ -200,32 +262,34 @@ int omnish_execute(char **program)
 // Function For Current Working Directory
 char *omnish_cwd(void)
 {
+    // Allocate Memory For Directory String
     size_t buffsize = OMNI_BUFSIZ;
     char *buff = malloc(sizeof(char) * buffsize);
 
     if (!buff) {
-        fprintf(stderr, "omnish: 03 Malloc Failed");
+        fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed\n" OMNI_RESET);
         return NULL;
     }
 
     /* AI Written Part - CODEX */
     while (getcwd(buff, buffsize) == NULL) {
+        // If 'errno' Returns Anything Besides 'ERANGE'
         if (errno != ERANGE) {
             perror("omnish");
             free(buff);
             return NULL;
         }
 
-        char *new_buff;
+        char *resized_buff;
 
         buffsize += OMNI_BUFSIZ;
-        new_buff = realloc(buff, sizeof(char) * buffsize);
-        if (!new_buff) {
-            fprintf(stderr, "omnish: 04 Malloc Failed");
+        resized_buff = realloc(buff, sizeof(char) * buffsize);
+        if (!resized_buff) {
+            fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed\n" OMNI_RESET);
             free(buff);
             return NULL;
         }
-        buff = new_buff;
+        buff = resized_buff;
     }
     /* AI Written Part - CODEX */
 
@@ -247,12 +311,13 @@ static char *omnish_prompt_path(const char *current_dir)
     char *display_dir;
 
     // Check For The NUL Byte Character
+    // When Dereferencing Character Pointers
     while (*position != '\0') {
         // If Character Does NOT Equal '/'
         if (*position != '/' && (position == current_dir || position[-1] == '/')) {
             components++;
         }
-        // Check Every Character
+        // Only When '/' Is Found In String
         position++;
     }
 
@@ -261,33 +326,38 @@ static char *omnish_prompt_path(const char *current_dir)
         int remaining = 3;
 
         // Remove All Folder Names That Aren't The Last 3 Directories
-        // If Current Directory Exceeds 5 Directories
+        // If Current Directory Length Exceeds 5 Directories
         position = current_dir + strlen(current_dir);
         while (position > current_dir) {
             position--;
             if (*position == '/') {
                 remaining--;
                 if (remaining == 0) {
+                    // Suffix Should Hold Index At The First Character
+                    // Of The Third To Last Directory
                     suffix = position + 1;
                     break;
                 }
             }
         }
 
+        // '5' Is For The Extra Characters Printed First
+        // Before The Directories Are Displayed
         display_size = strlen(suffix) + 5;
         display_dir = malloc(sizeof(char) * display_size);
         if (!display_dir) {
-            fprintf(stderr, "omnish: 03 Malloc Failed");
+            fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed\n" OMNI_RESET);
             return NULL;
         }
         snprintf(display_dir, display_size, ".../%s", suffix);
         return display_dir;
     }
 
+    // If File Path Components Is Less Than OR Equal To 5
     display_size = strlen(current_dir) + 1;
     display_dir = malloc(sizeof(char) * display_size);
     if (!display_dir) {
-        fprintf(stderr, "omnish: 03 Malloc Failed");
+        fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed\n" OMNI_RESET);
         return NULL;
     }
     strcpy(display_dir, current_dir);
