@@ -164,31 +164,49 @@ test_build()
 test_create_helper()
 {
     local bootstrap="$TEST_ROOT/bootstrap"
+    local failed_bootstrap="$TEST_ROOT/failed-bootstrap"
+    local expected_welcome_program="$TEST_ROOT/expected-welcome"
+    local expected_welcome
     local first_output
     local second_output
+    local failed_output
+    local failed_status
     local before
     local after
 
-    mkdir -p "$bootstrap"
+    mkdir -p "$bootstrap/tmp" "$failed_bootstrap"
     cp "$PROJECT_ROOT/omnicreate.sh" "$bootstrap/"
     cp "$PROJECT_ROOT/omnishell.c" "$PROJECT_ROOT/omnishell.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnifunc.c" "$PROJECT_ROOT/omnifunc.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnibuiltins.c" "$PROJECT_ROOT/omnibuiltins.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnirun.c" "$PROJECT_ROOT/omnirun.h" "$bootstrap/"
+    cp "$PROJECT_ROOT/welcome_to_omnishell.c" "$bootstrap/"
+
+    if ! gcc -std=c17 -Wall -Wextra -Wpedantic \
+        "$bootstrap/welcome_to_omnishell.c" \
+        -o "$expected_welcome_program"; then
+        FAIL_REASON="developer test setup could not compile the current welcome source"
+        return 1
+    fi
+    expected_welcome="$("$expected_welcome_program")"
+    if [[ -z "$expected_welcome" ]]; then
+        FAIL_REASON="developer test setup received empty output from the welcome source"
+        return 1
+    fi
 
     if [[ -e "$bootstrap/omnishell" ]]; then
         FAIL_REASON="isolated bootstrap unexpectedly started with an omnishell executable"
         return 1
     fi
 
-    first_output=$(cd "$bootstrap" && ./omnicreate.sh 2>&1)
+    first_output=$(cd "$bootstrap" && TMPDIR="$bootstrap/tmp" ./omnicreate.sh 2>&1)
     if [[ $? -ne 0 || ! -x "$bootstrap/omnishell" ]]; then
         FAIL_REASON="omnicreate.sh did not produce the isolated test executable"
         return 1
     fi
 
     before=$(cksum "$bootstrap/omnishell")
-    second_output=$(cd "$bootstrap" && ./omnicreate.sh 2>&1)
+    second_output=$(cd "$bootstrap" && TMPDIR="$bootstrap/tmp" ./omnicreate.sh 2>&1)
     after=$(cksum "$bootstrap/omnishell")
 
     if [[ "$second_output" != *"already built"* ]]; then
@@ -201,6 +219,32 @@ test_create_helper()
     fi
     if [[ "$first_output" != *"created successfully"* ]]; then
         FAIL_REASON="first omnicreate.sh invocation did not report successful creation"
+        return 1
+    fi
+    if [[ "$first_output" != *"$expected_welcome"* ]]; then
+        FAIL_REASON="first omnicreate.sh invocation did not print the current welcome source output; this is a developer-side integration error"
+        return 1
+    fi
+    if [[ "$second_output" == *"$expected_welcome"* ]]; then
+        FAIL_REASON="second omnicreate.sh invocation unexpectedly printed the welcome screen"
+        return 1
+    fi
+    if find "$bootstrap/tmp" -mindepth 1 -print -quit | grep -q .; then
+        FAIL_REASON="omnicreate.sh left a temporary welcome executable behind"
+        return 1
+    fi
+
+    cp "$PROJECT_ROOT/omnicreate.sh" "$failed_bootstrap/"
+    cp "$PROJECT_ROOT/welcome_to_omnishell.c" "$failed_bootstrap/"
+    failed_output=$(cd "$failed_bootstrap" && ./omnicreate.sh 2>&1)
+    failed_status=$?
+
+    if [[ "$failed_status" -eq 0 ]]; then
+        FAIL_REASON="omnicreate.sh returned success after the OmniShell build failed"
+        return 1
+    fi
+    if [[ "$failed_output" == *"$expected_welcome"* ]]; then
+        FAIL_REASON="omnicreate.sh printed the welcome screen after a failed build"
         return 1
     fi
 }

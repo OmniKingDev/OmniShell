@@ -23,7 +23,7 @@ This repository represents an early **v0.1-style foundation** and a systems-prog
 
 ## Requirements
 
-OmniShell currently targets a Linux/POSIX environment and uses POSIX process and filesystem interfaces including `fork()`, `execvp()`, `waitpid()`, `pipe()`, `fcntl()`, `stat()`, and `getcwd()`.
+OmniShell currently targets a Linux/POSIX(_POSIX_C_SOURCE 200809L) environment and uses POSIX process and filesystem interfaces including `fork()`, `execvp()`, `waitpid()`, `pipe()`, `fcntl()`, `stat()`, and `getcwd()`.
 
 To build and use the current version, you need:
 
@@ -44,7 +44,9 @@ From the repository directory, create the OmniShell executable once with:
 ./omnicreate.sh
 ```
 
-If `./omnishell` does not exist, the helper compiles all current translation units and links GNU Readline. If that path already exists, it exits successfully without rebuilding or overwriting it. Compiler and linker diagnostics remain visible intentionally, so a missing compiler, Readline development dependency, or source error is reported directly by the build tools.
+If `./omnishell` does not exist, the helper compiles all current translation units and links GNU Readline. After a successful build, it temporarily compiles and runs `welcome_to_omnishell.c` to show the OmniShell introduction, removes that temporary helper executable, and then prints the normal success and launch messages. The introduction is not shown when the OmniShell build fails.
+
+If `./omnishell` already exists, the helper exits successfully without rebuilding, overwriting it, or showing the first-build introduction. Compiler and linker diagnostics remain visible intentionally, so a missing compiler, Readline development dependency, or source error is reported directly by the build tools.
 
 After a successful build, start the shell with:
 

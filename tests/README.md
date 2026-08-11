@@ -14,7 +14,7 @@ You can also run it explicitly through Bash:
 bash tests/run_tests.sh
 ```
 
-The script creates an isolated temporary workspace, builds a separate `omnishell-test` binary, generates small Python, C, and C++ fixtures, and removes that workspace when it exits. It also copies the source and `omnicreate.sh` into that workspace to verify the one-time bootstrap behavior without touching the repository's normal `omnishell` executable or existing source fixtures.
+The script creates an isolated temporary workspace, builds a separate `omnishell-test` binary, generates small Python, C, and C++ fixtures, and removes that workspace when it exits. It also copies the source and `omnicreate.sh` into that workspace to verify the one-time bootstrap and successful welcome-screen behavior without touching the repository's normal `omnishell` executable or existing source fixtures.
 
 Each assertion compares an expected result with actual output, process status, or filesystem state. Every test prints `PASS` or `FAIL`; the final counters summarize the run. The script exits with status `0` only when all tests pass, allowing it to be used by another script or future continuous-integration system.
 
