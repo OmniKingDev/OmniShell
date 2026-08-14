@@ -9,7 +9,6 @@
 
 // Prototypes
 static char *omnish_prompt_path(const char *current_dir);
-static void omnish_init_readline(void);
 static void omnish_print_banner(void);
 
 // Used In omnishell.c To Launch Shell
@@ -91,14 +90,6 @@ void omnish(void)
 }
 
 /* NOTE: All Functions OmniShell Utilizes */
-
-// Read Line Initialization
-static void omnish_init_readline(void)
-{
-    // Call Readline's Default Keybinds
-    // Creating Readline To Be Interactive
-    rl_initialize();
-}
 
 static void omnish_print_banner(void)
 {

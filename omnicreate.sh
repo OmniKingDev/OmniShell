@@ -27,6 +27,7 @@ gcc -std=c17 -Wall -Wextra -Wpedantic \
     "$SCRIPT_DIR/omnifunc.c" \
     "$SCRIPT_DIR/omnibuiltins.c" \
     "$SCRIPT_DIR/omnirun.c" \
+    "$SCRIPT_DIR/omnireadline.c" \
     -o "$OMNISHELL" -lreadline
 status=$?
 

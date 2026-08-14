@@ -19,6 +19,7 @@
 #define OMNI_TOK_DELIM " \t\r\n\a"
 
 void omnish(void);
+void omnish_init_readline(void);
 char *omnish_read_line(const char *prompt);
 char *omnish_cwd(void);
 char **omnish_split_line(char *line);
