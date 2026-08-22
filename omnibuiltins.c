@@ -3,6 +3,12 @@
 #include "omnirun.h"
 #include "omnishell.h"
 
+
+// Global Variable
+// Brings Offset Tracking Variable
+// First Defined/Called In Main Shell Function In 'omnifunc.c'
+extern int session_start_index;
+
 // BOTH Static Types Must Have The Same Ordering
 static const char *builtin_command[] = {
     "cd",
@@ -36,9 +42,6 @@ static int (*builtin_program[])(char **) = {
     &omnish_history
 };
 
-// Declared Static Function(s)
-static char **omnish_line_history(char *new_line);
-
 // Grabs The Number Of Builtin OmniShell Holds
 int omnish_num_builtins(void)
 {
@@ -61,44 +64,6 @@ int omnish_run_builtin(char **program)
         }
     }
     return -1;
-}
-
-void omnish_store_line(char *line)
-{
-    // Compiler Might Complain "variable unused"
-    // But Used Just To Add 'line' To History List
-    omnish_line_history(line);
-}
-
-static char **omnish_line_history(char *new_line)
-{
-    // Create History List Of Lines
-    static char *history_list[OMNI_BUFSIZ];
-    static ssize_t history_count = 0;
-
-    // Make Sure 'new_line' Is Not NULL Or Empty String
-    if (new_line != NULL && *new_line != '\0') {
-        // If History Is Maxed, Then Shift List Down; Removing First Command Ever Recieved
-        // Continues Removing The Oldest Line As Lines Get Added.
-        if (history_count >= (ssize_t)OMNI_BUFSIZ) {
-            free(history_list[0]);
-            for (int i = 1; i < OMNI_BUFSIZ; i++) {
-                history_list[i - 1] = history_list[i];
-            }
-            history_count = OMNI_BUFSIZ - 1;
-        }
-        // Malloc For Line
-        history_list[history_count] = malloc(strlen(new_line) + 1);
-        if (!history_list[history_count]) {
-            fprintf(stderr, OMNI_ERROR "omnish: Couldn't add new copy of line to history.\n" OMNI_RESET);
-            return (history_count == 0) ? NULL : history_list;
-        }
-        // Copy 'new_line' Into History List At 'history_count' Index
-        strcpy(history_list[history_count], new_line);
-        history_count++;
-    }
-    // Return NULL If History Is Empty; Otherwise Return List
-    return (history_count == 0) ? NULL : history_list;
 }
 
 /* Builtin Functions */
@@ -186,20 +151,24 @@ int omnish_pwd(char **args)
     return 1;
 }
 
-int omnish_history(char **args) {
+int omnish_history(char **args)
+{
+    int display_num = 1;
+
     if (args[1] != NULL) {
         fprintf(stderr, OMNI_ERROR "omnish: Wrong Usage!\nUsage: history\nNO ARGUMENTS NEEDED.\n" OMNI_RESET);
         return 1;
     }
-    char **history = omnish_line_history(NULL);
+
+    HIST_ENTRY **history = history_list();
+
     if (!history) {
         printf(OMNI_OTHER "History currently empty\n" OMNI_RESET);
         return 1;
     }
-    int i = 0;
-    while (i < OMNI_BUFSIZ && history[i]) {
-        printf(OMNI_FG "  %d  %s\n" OMNI_RESET, i + 1, history[i]);
-        i++;
+
+    for (int i = 0; history[i] != NULL; i++) {
+        printf(OMNI_FG "  %d:  %s\n" OMNI_RESET, display_num++, history[i]->line);
     }
     return 1;
 }

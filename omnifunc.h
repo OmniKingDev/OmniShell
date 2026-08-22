@@ -12,8 +12,11 @@
 #include <sys/wait.h>
 #include <stdbool.h>
 #include <errno.h>
+
+// Readline Libraries
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <readline/rltypedefs.h>
 
 // Defining Delimeters
 #define OMNI_TOK_DELIM " \t\r\n\a"

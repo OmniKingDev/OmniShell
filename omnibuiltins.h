@@ -17,6 +17,5 @@ int omnish_history(char **args);
 
 int omnish_num_builtins(void);
 int omnish_run_builtin(char **program);
-void omnish_store_line(char *line);
 
 #endif
