@@ -4,7 +4,7 @@ OmniShell is an early Unix-style shell written in C. It combines the normal foun
 
 OmniRun addresses a small annoyance from programming exercises and single-file experiments: repeatedly typing or remembering the interpreter or compiler command. Instead of entering `python3 test.py`, or compiling and then running a C file manually, OmniShell can select the current tool from the file extension.
 
-This repository represents an early **v0.1-style foundation** and a systems-programming learning project. OmniShell is not presented as a replacement for Bash or Zsh, and OmniRun is not a replacement for Make, CMake, Meson, or another build system.
+Version 0.1 established OmniShell's first completed foundation as a systems-programming learning project. The current branch contains development and verification work preparing the project for v0.2; v0.2 has not been formally released. OmniShell is not presented as a replacement for Bash or Zsh, and OmniRun is not a replacement for Make, CMake, Meson, or another build system.
 
 
 #### Video Demo:  https://youtu.be/x0x3imhMWIY
@@ -64,13 +64,15 @@ gcc -std=c17 -Wall -Wextra -Wpedantic \
 
 ## Testing
 
-Run the v0.1 integration suite with:
+Run the current integration suite with:
 
 ```sh
 ./tests/run_tests.sh
 ```
 
-The dependency-free Bash harness creates its fixtures in an isolated temporary directory and reports each check as `PASS` or `FAIL`. It contains coverage for the one-time build helper and major v0.1 paths such as startup, builtins, external commands, Python/C/C++ OmniRun execution, output-collision protection, compiler-failure cleanup, and continued shell operation after errors. The history tests are being updated separately to match the current GNU History implementation and persistent-file behavior. See [`tests/README.md`](tests/README.md) for the testing approach.
+The dependency-free Bash harness creates its fixtures in an isolated temporary directory and reports each check as `PASS` or `FAIL`. Its 21 passing integration tests cover the one-time build helper, startup, builtins, external commands, Python/C/C++ OmniRun execution, output-collision protection, compiler-failure cleanup, continued shell operation after errors, and the complete current GNU History lifecycle.
+
+Every shell test receives a temporary `HOME`, so production code naturally reads and writes a test-specific `.omnish_history` instead of the developer's real history file. History coverage verifies current-session ordering, existing-file loading, duplicate prevention, missing-file creation, cross-process persistence, deleted-file recovery, and invalid-argument handling. See [`tests/README.md`](tests/README.md) for the testing approach.
 
 ## Start OmniShell
 
@@ -296,11 +298,11 @@ The goal is to build and understand a reliable foundation, then use that foundat
 
 ### Current development
 
-- Finish integration coverage for GNU History loading, appending, duplication prevention, missing-file creation, and deleted-file recovery.
+- Review the completed GNU History persistence implementation and its integration coverage for the v0.2 release.
 - Continue GNU Readline integration and interactive-shell usability work.
 - Continue development of common builtins and the one-time build helper.
 
-### v0.2 direction
+### v0.2 release direction
 
 - Add more common shell builtins.
 - Support additional languages in OmniRun.

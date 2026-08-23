@@ -384,7 +384,6 @@ static omnirun_process_result omnirun_run_process(char *const program[])
          * BELOW CODE HAPPENS If Unsuccessful Child Process Execution
          * Otherwise Current Process Image Is Changed To Given Program
         */
-        // If Error Value Is Returned By 'execvp'; 'errno' Will Know
         exec_err = errno;
 
         // Write Error Into Child's File Descriptor If Interruption Occured

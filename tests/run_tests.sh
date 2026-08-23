@@ -5,6 +5,7 @@
 # between what we expected and what the program actually produced.
 
 set -u
+# Allows Pipe To Report If Any Command In Pipe Failed
 set -o pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -75,12 +76,14 @@ run_shell()
 {
     local name=$1
     local commands=$2
+    local test_home="$TEST_ROOT/home-$name"
     local raw_output="$TEST_ROOT/$name.raw"
     local clean_output="$TEST_ROOT/$name.txt"
+    mkdir -p "$test_home"
 
     (
         cd "$TEST_WORKSPACE" || exit 1
-        "$TEST_BINARY" <<< "$commands"
+        HOME="$test_home" "$TEST_BINARY" <<< "$commands"
     ) >"$raw_output" 2>&1
     RUN_STATUS=$?
 
@@ -140,6 +143,19 @@ assert_line_once()
     fi
 }
 
+assert_file_line_once()
+{
+    local expected=$1
+    local file=$2
+    local matches
+
+    matches=$(grep -Fxc -- "$expected" "$file")
+    if [[ "$matches" -ne 1 ]]; then
+        FAIL_REASON="expected one history file line '$expected', found $matches"
+        return 1
+    fi
+}
+
 test_build()
 {
     if gcc -std=c17 -Wall -Wextra -Wpedantic \
@@ -147,6 +163,7 @@ test_build()
         "$PROJECT_ROOT/omnifunc.c" \
         "$PROJECT_ROOT/omnibuiltins.c" \
         "$PROJECT_ROOT/omnirun.c" \
+        "$PROJECT_ROOT/omnireadline.c" \
         -o "$TEST_BINARY" -lreadline 2>"$BUILD_LOG"; then
         if [[ -s "$BUILD_LOG" ]]; then
             printf '%s\n' '--- compiler warnings ---'
@@ -180,6 +197,7 @@ test_create_helper()
     cp "$PROJECT_ROOT/omnifunc.c" "$PROJECT_ROOT/omnifunc.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnibuiltins.c" "$PROJECT_ROOT/omnibuiltins.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnirun.c" "$PROJECT_ROOT/omnirun.h" "$bootstrap/"
+    cp "$PROJECT_ROOT/omnireadline.c" "$bootstrap/"
     cp "$PROJECT_ROOT/welcome_to_omnishell.c" "$bootstrap/"
 
     if ! gcc -std=c17 -Wall -Wextra -Wpedantic \
@@ -279,13 +297,98 @@ test_help()
         && assert_contains " history"
 }
 
-test_history()
+test_history_current_session()
 {
-    run_shell history $'pwd\nhelp\nhistory\nexit'
+    run_shell current_history_list $'pwd\nhelp\nhistory\nexit'
     assert_status 0 \
-        && assert_line_once "  1  pwd" \
-        && assert_line_once "  2  help" \
-        && assert_line_once "  3  history"
+        && assert_line_once "  1:  pwd" \
+        && assert_line_once "  2:  help" \
+        && assert_line_once "  3:  history"
+}
+
+test_history_loads_existing_file()
+{
+    local test_home="$TEST_ROOT/home-persistent_history_check"
+    mkdir -p "$test_home"
+    printf '%s\n' \
+        'cat nofile.txt' \
+        'echo noname' \
+        > "$test_home/.omnish_history"
+    run_shell persistent_history_check $'history\nexit'
+    assert_status 0 \
+        && assert_line_once "  1:  cat nofile.txt" \
+        && assert_line_once "  2:  echo noname" \
+        && assert_line_once "  3:  history"
+}
+
+test_history_does_not_dup_load_entries()
+{
+    local test_home="$TEST_ROOT/home-no_duplicated_entries"
+    mkdir -p "$test_home"
+    printf '%s\n' \
+        'ls' \
+        'echo Hello' \
+        > "$test_home/.omnish_history"
+    run_shell no_duplicated_entries $'pwd\nexit'
+    assert_status 0
+    run_shell no_duplicated_entries $'help\nexit'
+    assert_status 0
+    run_shell no_duplicated_entries $'history\nexit'
+    assert_status 0 \
+        && assert_file_line_once "ls" "$test_home/.omnish_history" \
+        && assert_file_line_once "echo Hello" "$test_home/.omnish_history" \
+        && assert_file_line_once "pwd" "$test_home/.omnish_history" \
+        && assert_file_line_once "help" "$test_home/.omnish_history" \
+        && assert_file_line_once "history" "$test_home/.omnish_history"
+}
+
+test_missing_history_file()
+{
+    run_shell missing_history_file $'pwd\nexit'
+    local file="$TEST_ROOT/home-missing_history_file/.omnish_history"
+    if [[ ! -f "$file" || ! -r "$file" ]]; then
+        FAIL_REASON="expected one history file to persist: $file"
+        return 1
+    fi
+    assert_status 0 \
+        && assert_file_line_once "pwd" "$file" \
+        && assert_file_line_once "exit" "$file"
+}
+
+test_history_persists_between_sessions()
+{
+    run_shell same_history_persist $'ls\npwd\nexit'
+    assert_status 0
+    run_shell same_history_persist $'history\nexit'
+    assert_status 0 \
+        && assert_line_once "  1:  ls" \
+        && assert_line_once "  2:  pwd" \
+        && assert_line_once "  3:  exit" \
+        && assert_line_once "  4:  history"
+}
+
+test_history_file_recovery()
+{
+    local test_home="$TEST_ROOT/home-history_file_recovery"
+    local commands
+    printf -v commands \
+        'ls\nrm %s/.omnish_history\nhistory\nexit' \
+        "$test_home"
+    mkdir -p "$test_home"
+    printf '%s\n' \
+        'man ls' \
+        'cd' \
+        > "$test_home/.omnish_history"
+    run_shell history_file_recovery "$commands"
+    assert_status 0 \
+        && assert_file_line_once "ls" "$test_home/.omnish_history" \
+        && assert_file_line_once "rm $test_home/.omnish_history" "$test_home/.omnish_history" \
+        && assert_file_line_once "history" "$test_home/.omnish_history" \
+        && assert_file_line_once "exit" "$test_home/.omnish_history" \
+        && assert_file_line_once "man ls" "$test_home/.omnish_history" \
+        && assert_file_line_once "cd" "$test_home/.omnish_history" \
+        && assert_line_once "  1:  man ls" \
+        && assert_line_once "  2:  cd"
 }
 
 test_history_wrong_usage()
@@ -423,7 +526,12 @@ if [[ -x "$TEST_BINARY" ]]; then
     run_test "pwd builtin" test_pwd
     run_test "cd changes shell directory" test_cd_and_pwd
     run_test "help lists current builtins" test_help
-    run_test "history builtin ordering" test_history
+    run_test "history current session" test_history_current_session
+    run_test "history loads existing file" test_history_loads_existing_file
+    run_test "history avoids duplicate loaded entries" test_history_does_not_dup_load_entries
+    run_test "history creates missing file" test_missing_history_file
+    run_test "history persists between sessions" test_history_persists_between_sessions
+    run_test "history file recovery" test_history_file_recovery
     run_test "history rejects arguments" test_history_wrong_usage
     run_test "external command" test_external_command
     run_test "omnirun Python" test_omnirun_python

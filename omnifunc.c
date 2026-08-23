@@ -69,7 +69,6 @@ void omnish(void)
 
     // 'history_length' Holds The Number Of Lines Loaded
     session_start_index = history_length;
-
     // Start Loop
     do {
         current_dir = omnish_cwd();
