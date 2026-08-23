@@ -197,7 +197,7 @@ test_create_helper()
     cp "$PROJECT_ROOT/omnifunc.c" "$PROJECT_ROOT/omnifunc.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnibuiltins.c" "$PROJECT_ROOT/omnibuiltins.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnirun.c" "$PROJECT_ROOT/omnirun.h" "$bootstrap/"
-    cp "$PROJECT_ROOT/omnireadline.c" "$bootstrap/"
+    cp "$PROJECT_ROOT/omnireadline.c" "$PROJECT_ROOT/omnireadline.h" "$bootstrap/"
     cp "$PROJECT_ROOT/welcome_to_omnishell.c" "$bootstrap/"
 
     if ! gcc -std=c17 -Wall -Wextra -Wpedantic \

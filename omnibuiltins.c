@@ -2,6 +2,7 @@
 #include "omnifunc.h"
 #include "omnirun.h"
 #include "omnishell.h"
+#include "omnireadline.h"
 
 
 // Global Variable

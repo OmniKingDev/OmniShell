@@ -3,6 +3,7 @@
 // Main Shell Functions (REPL)
 #include "omnifunc.h"
 #include "omnishell.h"
+#include "omnireadline.h"
 
 // Shell Builtins Header File
 #include "omnibuiltins.h"
@@ -24,51 +25,12 @@ void omnish(void)
     char *current_dir;
     char *display_dir;
     int status;
-
     // Initialize Keybinds Readline Provides
     // Print Banner
     omnish_init_readline();
     omnish_print_banner();
-
     // Initialize History Library Features
-    using_history();
-
-    // Variables For History
-    int read_hist_state;
-    int write_hist_state;
-    char *home;
-    size_t history_path_size;
-    char *history_file;
-
-    // Create File Path Name For GNU History
-    home = getenv("HOME");
-    history_path_size = strlen(home) + strlen("/.omnish_history") + 1;
-    history_file = malloc(history_path_size);
-
-    snprintf(history_file, history_path_size, "%s/.omnish_history", home);
-
-
-    // Read From History
-    // NULL Pointer Tells History To Use File '~/.history'
-    // This Only Grabs The Last 3000 Commands Ran By User
-    // From The Previous Shell Usage
-    // Entire History Is Still Not Lost
-    read_hist_state = read_history(history_file);
-
-    if (read_hist_state == ENOENT) {
-        write_hist_state = write_history(history_file);
-
-        if (write_hist_state != 0) {
-            fprintf(stderr, "omnish: history file not be created: %s\n", strerror(write_hist_state));
-        }
-    }
-
-    if (read_hist_state != 0 && read_hist_state != ENOENT) {
-        fprintf(stderr, "omnish: history file not loaded: %s\n", strerror(read_hist_state));
-    }
-
-    // 'history_length' Holds The Number Of Lines Loaded
-    session_start_index = history_length;
+    omnish_history_init();
     // Start Loop
     do {
         current_dir = omnish_cwd();
@@ -76,7 +38,6 @@ void omnish(void)
         if (!current_dir) {
             return;
         }
-
         // Returns Shorter Version Of Current Working Directory Path
         // ONLY If Path Exceeds Set Limit For Directories Shown
         display_dir = omnish_prompt_path(current_dir);
@@ -84,31 +45,24 @@ void omnish(void)
             free(current_dir);
             return;
         }
-
         /* NOTE:
          *  All 'omni*' Made Functions Are Declared In Header File 'omnifunc.h'
          *  EXCEPT For Any Function With A 'static' Type Remains In This File
          */
-
         // Prompt User
         char *omnish_prompt = "\n\001" OMNI_BRPINK "\002omnishellv0.1\001" OMNI_RESET "\002 ==> ";
         size_t prompt_size = strlen(display_dir) + strlen(omnish_prompt) + 1;
-
         char *prompt = malloc(prompt_size);
-
         if (!prompt) {
             free(display_dir);
             free(current_dir);
             return;
         }
-
         // Final Prompt User Sees
         snprintf(prompt, prompt_size, "%s%s", display_dir, omnish_prompt);
-
         // Free Memory After Use
         free(display_dir);
         free(current_dir);
-
         // Then Hand Prompt To Use In 'readline' Function
         line = omnish_read_line(prompt);
         free(prompt);
@@ -117,35 +71,15 @@ void omnish(void)
         if (!line) {
             break;
         }
-
         // Then Parse Line To Separate Commands
         argv = omnish_split_line(line);
-
         // Grab Status To Confirm Execution Of Arguments
         status = omnish_execute(argv);
-
         // Free Up Memory Used To Execute Arguments
         free(line);
         free(argv);
-
     } while (status);
-
-    int session_history_length = history_length - session_start_index;
-    if (session_history_length > 0) {
-        // Ensures That History Of This Session Is Not Overwriting The Last Entry
-        write_hist_state = append_history(session_history_length, history_file);
-        if (write_hist_state == ENOENT) {
-            write_hist_state = write_history(history_file);
-
-            if (write_hist_state != 0) {
-                fprintf(stderr, "omnish: history file couldn't be recreated: %s\n", strerror(write_hist_state));
-            }
-        } else if (write_hist_state != 0) {
-            fprintf(stderr, "omnish: current history session couldn't be saved: %s\n", strerror(write_hist_state));
-        }
-    }
-    clear_history();
-    free(history_file);
+    omnish_end_history();
 }
 
 /* NOTE: All Functions OmniShell Utilizes */
