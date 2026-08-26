@@ -12,7 +12,7 @@ Version 0.1 established OmniShell's first completed foundation as a systems-prog
 
 ## Current Features
 
-- Interactive REPL input through GNU Readline.
+- Interactive REPL input through GNU Readline, with command, pathname, and filename completion.
 - Persistent GNU Readline/GNU History support, the `history` builtin, and standard Readline editing keys.
 - A current-directory prompt refreshed after every command.
 - A compact startup identity banner with semantic terminal colors.
@@ -58,7 +58,8 @@ There is no Makefile in the repository yet. The equivalent direct build command 
 
 ```sh
 gcc -std=c17 -Wall -Wextra -Wpedantic \
-    omnishell.c omnifunc.c omnibuiltins.c omnirun.c omnireadline.c \
+    omnishell.c omnifunc.c omnibuiltins.c omnirun.c \
+    omnireadline.c omnireadline_keybinds.c \
     -o omnishell -lreadline
 ```
 
@@ -70,9 +71,9 @@ Run the current integration suite with:
 ./tests/run_tests.sh
 ```
 
-The dependency-free Bash harness creates its fixtures in an isolated temporary directory and reports each check as `PASS` or `FAIL`. Its 21 passing integration tests cover the one-time build helper, startup, builtins, external commands, Python/C/C++ OmniRun execution, output-collision protection, compiler-failure cleanup, continued shell operation after errors, and the complete current GNU History lifecycle.
+The Bash harness creates its fixtures in an isolated temporary directory and reports each check as `PASS` or `FAIL`. Its 30 passing integration tests cover the one-time build helper, startup, builtins, external commands, Python/C/C++ OmniRun execution, output-collision protection, compiler-failure cleanup, continued shell operation after errors, the GNU History lifecycle, and interactive Readline behavior.
 
-Every shell test receives a temporary `HOME`, so production code naturally reads and writes a test-specific `.omnish_history` instead of the developer's real history file. History coverage verifies current-session ordering, existing-file loading, duplicate prevention, missing-file creation, cross-process persistence, deleted-file recovery, and invalid-argument handling. See [`tests/README.md`](tests/README.md) for the testing approach.
+Every shell test receives a temporary `HOME`, so production code naturally reads and writes a test-specific `.omnish_history` instead of the developer's real history file. History coverage verifies current-session ordering, existing-file loading, duplicate prevention, missing-file creation, cross-process persistence, deleted-file recovery, and invalid-argument handling. A small Python standard-library PTY driver sends real TAB and arrow-key sequences to verify interactive keybindings that piped input cannot exercise. See [`tests/README.md`](tests/README.md) for the testing approach.
 
 ## Start OmniShell
 
@@ -87,6 +88,12 @@ A new session initializes Readline, prints the OmniShell v0.1 banner once, and e
 OmniShell initializes GNU History and loads previously saved entries from `$HOME/.omnish_history` into memory. Each non-empty command accepted through Readline is added to that same in-memory history. OmniShell records the loaded history length at startup, then uses that boundary during normal shutdown to append only commands entered by the current process instead of duplicating older disk entries.
 
 The history file does not require manual setup during normal shell use. If `$HOME/.omnish_history` is missing at startup, GNU History creates a clean OmniShell-specific file. If the file is deleted while OmniShell is running and the session has new commands to save, the failed append is followed by a full `write_history()` recovery from the history still held in memory.
+
+### Readline Completion and Navigation
+
+TAB completion treats the first word as a command. OmniShell searches its builtin names and executable regular files found through `PATH`, removes duplicate names, sorts matches alphabetically, and lets Readline display ambiguous results. When a result set exceeds 80 items, Readline asks before displaying the complete list. On a completely empty line, the first TAB rings the terminal bell and a second consecutive TAB requests the possible-completions display.
+
+Arguments and command text containing `/` use Readline's normal filename/path completion instead of OmniShell's command-name search. Up and Down are bound to backward and forward prefix history search: text already entered on the line filters which history entries are visited. Ctrl-R continues to use GNU Readline's standard reverse-search behavior; OmniShell does not replace it with a custom search implementation.
 
 ## Builtins
 
@@ -256,7 +263,7 @@ OmniRun v0.1 does not understand multiple translation units or arbitrary build o
 ```sh
 gcc main.c parser.c utils.c -o program
 gcc program.c -o program -lm -pthread
-gcc omnishell.c omnifunc.c omnibuiltins.c omnirun.c omnireadline.c -o omnishell -lreadline
+gcc omnishell.c omnifunc.c omnibuiltins.c omnirun.c omnireadline.c omnireadline_keybinds.c -o omnishell -lreadline
 ```
 
 It does not accept program arguments, multiple source files, include paths, library paths, preprocessor definitions, optimization flags, build manifests, or dependency graphs. Project/build-system detection, directory scanning, and automatic language detection outside the explicit `omnirun` builtin are also outside v0.1.
@@ -267,11 +274,12 @@ It does not accept program arguments, multiple source files, include paths, libr
 | --- | --- |
 | `omnishell.c` | Program entry point; starts the shell loop. |
 | `omnishell.h` | Shared semantic terminal-color definitions. |
-| `omnifunc.c` | Shell loop, startup banner, prompt construction, parsing, execution control, external process launching, current-directory display, and persistent-history lifecycle. |
+| `omnifunc.c` | Shell loop, startup banner, prompt construction, parsing, execution control, external process launching, and current-directory display. |
 | `omnifunc.h` | Shared shell macros, dependencies, and public shell-control declarations. |
 | `omnibuiltins.c` | Private builtin registration tables, dispatch, and the small `cd`, `help`, `pwd`, `history`, and `exit` implementations. |
 | `omnibuiltins.h` | Public builtin declarations and OmniRun interface dependency. |
-| `omnireadline.c` | Readline initialization, input collection, and addition of accepted non-empty commands to GNU History memory. |
+| `omnireadline.c` | Readline initialization, input collection, GNU History initialization and persistence, and addition of accepted non-empty commands to history memory. |
+| `omnireadline_keybinds.c` | Custom TAB completion plus Up/Down prefix-history keybindings. |
 | `omnirun.c` | OmniRun validation, extension/tool selection, output naming, collision protection, compiler/interpreter execution, process-result handling, and cleanup. |
 | `omnirun.h` | OmniRun's public declaration plus the process-result types and current preprocessing dependencies. |
 
@@ -298,8 +306,8 @@ The goal is to build and understand a reliable foundation, then use that foundat
 
 ### Current development
 
-- Review the completed GNU History persistence implementation and its integration coverage for the v0.2 release.
-- Continue GNU Readline integration and interactive-shell usability work.
+- Review the completed GNU History persistence and interactive Readline integration coverage for the v0.2 release.
+- Continue GNU Readline and interactive-shell usability work from this tested foundation.
 - Continue development of common builtins and the one-time build helper.
 
 ### v0.2 release direction

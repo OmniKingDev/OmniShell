@@ -14,6 +14,7 @@ TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/omnishell-tests.XXXXXX")"
 TEST_BINARY="$TEST_ROOT/omnishell-test"
 TEST_WORKSPACE="$TEST_ROOT/workspace"
 BUILD_LOG="$TEST_ROOT/build.log"
+READLINE_PTY_TESTS="$SCRIPT_DIR/readline_pty_tests.py"
 
 passed=0
 failed=0
@@ -164,6 +165,7 @@ test_build()
         "$PROJECT_ROOT/omnibuiltins.c" \
         "$PROJECT_ROOT/omnirun.c" \
         "$PROJECT_ROOT/omnireadline.c" \
+        "$PROJECT_ROOT/omnireadline_keybinds.c" \
         -o "$TEST_BINARY" -lreadline 2>"$BUILD_LOG"; then
         if [[ -s "$BUILD_LOG" ]]; then
             printf '%s\n' '--- compiler warnings ---'
@@ -197,7 +199,7 @@ test_create_helper()
     cp "$PROJECT_ROOT/omnifunc.c" "$PROJECT_ROOT/omnifunc.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnibuiltins.c" "$PROJECT_ROOT/omnibuiltins.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnirun.c" "$PROJECT_ROOT/omnirun.h" "$bootstrap/"
-    cp "$PROJECT_ROOT/omnireadline.c" "$PROJECT_ROOT/omnireadline.h" "$bootstrap/"
+    cp "$PROJECT_ROOT/omnireadline.c" "$PROJECT_ROOT/omnireadline_keybinds.c" "$PROJECT_ROOT/omnireadline.h" "$bootstrap/"
     cp "$PROJECT_ROOT/welcome_to_omnishell.c" "$bootstrap/"
 
     if ! gcc -std=c17 -Wall -Wextra -Wpedantic \
@@ -467,6 +469,33 @@ test_missing_source()
         && assert_contains "MISSING_SOURCE_SURVIVED"
 }
 
+# Piped stdin is sufficient for command execution and persistent-history tests,
+# but Readline only exposes real keybinding behavior when attached to a terminal.
+# These cases use a small Python standard-library PTY driver to send the same TAB
+# and arrow-key bytes as a user and assert against the resulting shell behavior.
+run_readline_pty_case()
+{
+    local case_name=$1
+
+    if ! python3 "$READLINE_PTY_TESTS" \
+        "$case_name" \
+        "$TEST_BINARY" \
+        "$TEST_ROOT/readline-$case_name"; then
+        FAIL_REASON="interactive Readline PTY case failed: $case_name"
+        return 1
+    fi
+}
+
+test_readline_command_completion() { run_readline_pty_case command-completion; }
+test_readline_builtin_completion() { run_readline_pty_case builtin-completion; }
+test_readline_ambiguous_completion() { run_readline_pty_case ambiguous-completion; }
+test_readline_duplicate_suppression() { run_readline_pty_case duplicate-suppression; }
+test_readline_empty_buffer_tabs() { run_readline_pty_case empty-buffer-tabs; }
+test_readline_completion_query() { run_readline_pty_case completion-query; }
+test_readline_filename_completion() { run_readline_pty_case filename-completion; }
+test_readline_pathname_completion() { run_readline_pty_case pathname-completion; }
+test_readline_history_prefix_navigation() { run_readline_pty_case history-prefix-navigation; }
+
 # Arrange: create isolated source files used by the black-box OmniRun tests.
 cat >"$TEST_WORKSPACE/python_case.py" <<'PYTHON'
 print("PYTHON_TEST_OK")
@@ -541,6 +570,15 @@ if [[ -x "$TEST_BINARY" ]]; then
     run_test "failed compilation cleanup and shell survival" test_failed_compilation_cleanup
     run_test "unsupported extension" test_unsupported_extension
     run_test "missing source and shell survival" test_missing_source
+    run_test "Readline completes executable commands" test_readline_command_completion
+    run_test "Readline completes builtins" test_readline_builtin_completion
+    run_test "Readline displays ambiguous matches alphabetically" test_readline_ambiguous_completion
+    run_test "Readline suppresses duplicate PATH matches" test_readline_duplicate_suppression
+    run_test "Readline empty-buffer TAB behavior" test_readline_empty_buffer_tabs
+    run_test "Readline completion query prompt" test_readline_completion_query
+    run_test "Readline filename completion fallback" test_readline_filename_completion
+    run_test "Readline pathname completion fallback" test_readline_pathname_completion
+    run_test "Readline history prefix navigation" test_readline_history_prefix_navigation
 fi
 
 printf '\n%d passed\n%d failed\n' "$passed" "$failed"

@@ -53,6 +53,7 @@ gcc -std=c17 -Wall -Wextra -Wpedantic \
     "$SCRIPT_DIR/omnibuiltins.c" \
     "$SCRIPT_DIR/omnirun.c" \
     "$SCRIPT_DIR/omnireadline.c" \
+    "$SCRIPT_DIR/omnireadline_keybinds.c" \
     -o "$OMNISHELL" -lreadline
 
 # Grab Status Code Of Command Most Recently Ran('gcc')

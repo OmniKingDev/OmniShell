@@ -71,7 +71,6 @@ void omnish(void)
         if (!line) {
             break;
         }
-        // Then Parse Line To Separate Commands
         argv = omnish_split_line(line);
         // Grab Status To Confirm Execution Of Arguments
         status = omnish_execute(argv);

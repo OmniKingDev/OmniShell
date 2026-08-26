@@ -1,19 +1,20 @@
 #include "omnifunc.h"
 #include "omnireadline.h"
 
-// Private To This File Only
+// Private Varibales To This File Only
 static char *history_file = NULL;
 static int session_start_index;
 
-// Upgrade Readline
+static void omnish_add_history(const char *line);
+
 void omnish_init_readline(void)
 {
     // Call Readline's Default Keybinds
     // Creating Readline To Be Interactive
     rl_initialize();
 
-    // Custom Keybinds
-
+    // Load OmniShell Custom Keybinds Extensions
+    omnish_init_keybinds();
 }
 
 // Read From Stdin function
@@ -33,9 +34,21 @@ char *omnish_read_line(const char *prompt)
 
     // Return If 'readline' Was Successful And Not An Empty String
     if (line && *line) {
-        add_history(line);
+        omnish_add_history(line);
     }
     return line;
+}
+
+static void omnish_add_history(const char *line)
+{
+    HIST_ENTRY **history = history_list();
+    if (history != NULL && history_length > 0) {
+        HIST_ENTRY *last_entry = history[history_length - 1];
+        if (strcmp(last_entry->line, line) == 0) {
+            return;
+        }
+    }
+    add_history(line);
 }
 
 void omnish_history_init(void)
