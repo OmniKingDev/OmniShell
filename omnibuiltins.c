@@ -17,7 +17,8 @@ static const char *builtin_command[] = {
     "exit",
     "pwd",
     "omnirun",
-    "history"
+    "history",
+    "echo"
 };
 
 /* NOTE: --> Declare An Array Of Pointers To Function Types
@@ -40,7 +41,8 @@ static int (*builtin_program[])(char **) = {
     &omnish_exit,
     &omnish_pwd,
     &omnish_omnirun,
-    &omnish_history
+    &omnish_history,
+    &omnish_echo
 };
 
 // Grabs The Number Of Builtin OmniShell Holds
@@ -83,6 +85,33 @@ int omnish_cd(char **args)
             perror("omnish");
         }
     }
+    return 1;
+}
+
+int omnish_echo(char **args)
+{
+    int newline = 1;
+    int i = 1;
+
+    if (args[i] != NULL && strcmp(args[i], "-n") == 0) {
+        newline = 0;
+        i++;
+    }
+
+    while (args[i] != NULL) {
+        printf("%s", args[i]);
+
+        if (args[i + 1] != NULL) {
+            printf(" ");
+        }
+
+        i++;
+    }
+
+    if (newline) {
+        printf("\n");
+    }
+
     return 1;
 }
 

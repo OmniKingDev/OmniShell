@@ -281,6 +281,12 @@ test_pwd()
     assert_status 0 && assert_line_present "$TEST_WORKSPACE"
 }
 
+test_echo()
+{
+    run_shell pwd $'echo Hello\nexit'
+    assert_status 0 && assert_contains "Hello"
+}
+
 test_cd_and_pwd()
 {
     run_shell cd_pwd $'cd change-directory\npwd\nexit'
@@ -553,6 +559,7 @@ run_test "one-time build helper" test_create_helper
 if [[ -x "$TEST_BINARY" ]]; then
     run_test "shell starts and exits" test_start_and_exit
     run_test "pwd builtin" test_pwd
+    run_test "echo builtin" test_echo
     run_test "cd changes shell directory" test_cd_and_pwd
     run_test "help lists current builtins" test_help
     run_test "history current session" test_history_current_session

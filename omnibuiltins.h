@@ -14,6 +14,7 @@ int omnish_help(char **args);
 int omnish_exit(char **args);
 int omnish_pwd(char **args);
 int omnish_history(char **args);
+int omnish_echo(char **args);
 
 int omnish_num_builtins(void);
 int omnish_run_builtin(char **program);
