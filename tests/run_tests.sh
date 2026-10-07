@@ -162,6 +162,9 @@ test_build()
     if gcc -std=c17 -Wall -Wextra -Wpedantic \
         "$PROJECT_ROOT/omnishell.c" \
         "$PROJECT_ROOT/omnifunc.c" \
+        "$PROJECT_ROOT/omniparser.c" \
+        "$PROJECT_ROOT/omnilauncher.c" \
+        "$PROJECT_ROOT/omnicommands.c" \
         "$PROJECT_ROOT/omnibuiltins.c" \
         "$PROJECT_ROOT/omnirun.c" \
         "$PROJECT_ROOT/omnireadline.c" \
@@ -197,6 +200,9 @@ test_create_helper()
     cp "$PROJECT_ROOT/omnicreate.sh" "$bootstrap/"
     cp "$PROJECT_ROOT/omnishell.c" "$PROJECT_ROOT/omnishell.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnifunc.c" "$PROJECT_ROOT/omnifunc.h" "$bootstrap/"
+    cp "$PROJECT_ROOT/omniparser.c" "$PROJECT_ROOT/omniparser.h" "$bootstrap/"
+    cp "$PROJECT_ROOT/omnilauncher.c" "$PROJECT_ROOT/omnilauncher.h" "$bootstrap/"
+    cp "$PROJECT_ROOT/omnicommands.c" "$PROJECT_ROOT/omnicommands.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnibuiltins.c" "$PROJECT_ROOT/omnibuiltins.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnirun.c" "$PROJECT_ROOT/omnirun.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnireadline.c" "$PROJECT_ROOT/omnireadline_keybinds.c" "$PROJECT_ROOT/omnireadline.h" "$bootstrap/"
@@ -413,6 +419,48 @@ test_external_command()
     assert_status 0 && assert_contains "EXTERNAL_TEST_OK"
 }
 
+test_single_and_builtin_pipelines()
+{
+    run_shell single_pipeline $'echo BUILTIN_PIPE_OK | grep BUILTIN_PIPE_OK\npwd | cat\nexit'
+    assert_status 0 \
+        && assert_contains "BUILTIN_PIPE_OK" \
+        && assert_contains "$TEST_WORKSPACE"
+}
+
+test_multiple_pipeline()
+{
+    run_shell multiple_pipeline $'printf MULTIPLE_PIPE_OK | cat | cat\nexit'
+    assert_status 0 && assert_contains "MULTIPLE_PIPE_OK"
+}
+
+test_input_output_redirection()
+{
+    run_shell redirection $'echo first > launcher-output.txt\necho second >> launcher-output.txt\ncat < launcher-output.txt\nexit'
+    assert_status 0 \
+        && assert_contains "first" \
+        && assert_contains "second" \
+        && [[ "$(<"$TEST_WORKSPACE/launcher-output.txt")" == $'first\nsecond' ]]
+}
+
+test_pipeline_and_builtin_redirection()
+{
+    run_shell pipeline_redirection $'echo PIPE_FILE_OK | cat > launcher-pipe.txt\npwd > launcher-pwd.txt\ncat launcher-pipe.txt\necho REDIRECTION_RESTORED\nexit'
+    assert_status 0 \
+        && assert_contains "PIPE_FILE_OK" \
+        && assert_contains "REDIRECTION_RESTORED" \
+        && grep -Fq -- "$TEST_WORKSPACE" "$TEST_WORKSPACE/launcher-pwd.txt"
+}
+
+test_malformed_execution_syntax()
+{
+    run_shell malformed_execution $'|\nls |\n| ls\n>\nls >\n>>\ncat <\nls || grep\necho MALFORMED_SURVIVED\nexit'
+    assert_status 0 \
+        && assert_contains "expected a command beside '|'" \
+        && assert_contains "expected a command after '|'" \
+        && assert_contains "redirection requires a filename" \
+        && assert_contains "MALFORMED_SURVIVED"
+}
+
 test_omnirun_python()
 {
     run_shell python $'omnirun python_case.py\nexit'
@@ -570,6 +618,11 @@ if [[ -x "$TEST_BINARY" ]]; then
     run_test "history file recovery" test_history_file_recovery
     run_test "history rejects arguments" test_history_wrong_usage
     run_test "external command" test_external_command
+    run_test "single and builtin pipelines" test_single_and_builtin_pipelines
+    run_test "multiple pipeline" test_multiple_pipeline
+    run_test "input and output redirection" test_input_output_redirection
+    run_test "pipeline and builtin redirection" test_pipeline_and_builtin_redirection
+    run_test "malformed execution syntax" test_malformed_execution_syntax
     run_test "omnirun Python" test_omnirun_python
     run_test "omnirun C" test_omnirun_c
     run_test "omnirun C++ through g++ behavior" test_omnirun_cpp

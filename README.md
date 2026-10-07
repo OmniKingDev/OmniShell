@@ -58,7 +58,8 @@ There is no Makefile in the repository yet. The equivalent direct build command 
 
 ```sh
 gcc -std=c17 -Wall -Wextra -Wpedantic \
-    omnishell.c omnifunc.c omnibuiltins.c omnirun.c \
+    omnishell.c omnifunc.c omniparser.c omnilauncher.c \
+    omnicommands.c omnibuiltins.c omnirun.c \
     omnireadline.c omnireadline_keybinds.c \
     -o omnishell -lreadline
 ```
@@ -71,7 +72,7 @@ Run the current integration suite with:
 ./tests/run_tests.sh
 ```
 
-The Bash harness creates its fixtures in an isolated temporary directory and reports each check as `PASS` or `FAIL`. Its 30 passing integration tests cover the one-time build helper, startup, builtins, external commands, Python/C/C++ OmniRun execution, output-collision protection, compiler-failure cleanup, continued shell operation after errors, the GNU History lifecycle, and interactive Readline behavior.
+The Bash harness creates its fixtures in an isolated temporary directory and reports each check as `PASS` or `FAIL`. Its 36 passing integration tests cover the one-time build helper, startup, builtins, external commands, pipelines, redirection, malformed execution syntax, Python/C/C++ OmniRun execution, output-collision protection, compiler-failure cleanup, continued shell operation after errors, the GNU History lifecycle, and interactive Readline behavior.
 
 Every shell test receives a temporary `HOME`, so production code naturally reads and writes a test-specific `.omnish_history` instead of the developer's real history file. History coverage verifies current-session ordering, existing-file loading, duplicate prevention, missing-file creation, cross-process persistence, deleted-file recovery, and invalid-argument handling. A small Python standard-library PTY driver sends real TAB and arrow-key sequences to verify interactive keybindings that piped input cannot exercise. See [`tests/README.md`](tests/README.md) for the testing approach.
 
@@ -158,7 +159,7 @@ Runs one supported, explicit, regular source file. OmniRun supplies the interpre
 
 ## External Commands
 
-Commands not matched by the builtin table are launched as child processes. OmniShell passes the token array to `execvp()` and waits for the child before showing the next prompt.
+Commands not matched by the builtin table are launched as child processes. The launcher builds a borrowed-pointer argv for each pipe-delimited command section, calls `execvp()`, and waits for every child before showing the next prompt.
 
 Examples:
 
@@ -171,7 +172,17 @@ examples/program
 
 `execvp()` searches `PATH` when the command contains no slash. A relative executable such as `./shell-c/test` begins from the current directory. An absolute-looking path such as `/shell-c/test` begins at the filesystem root and refers to a different location.
 
-The current parser splits input on whitespace characters. It does not yet implement shell quoting, escaping, pipelines, redirection, glob expansion, background execution, or job control. Operator characters such as `|`, `>`, and `&` are currently ordinary arguments rather than shell syntax.
+The current tokenizer recognizes double-quoted word groups, pipelines, input redirection, output replacement, and output append. Examples include:
+
+```sh
+echo hello | grep hello
+cat < input.txt
+echo hello > output.txt
+echo again >> output.txt
+cat < input.txt | grep hello > result.txt
+```
+
+Standalone builtins run in the parent so commands such as `cd` and `exit` can change shell state. Builtins inside pipelines run in child processes. Single quotes, backslash escaping, glob expansion, background execution, and job control are not implemented.
 
 ## OmniRun
 
@@ -263,7 +274,7 @@ OmniRun v0.1 does not understand multiple translation units or arbitrary build o
 ```sh
 gcc main.c parser.c utils.c -o program
 gcc program.c -o program -lm -pthread
-gcc omnishell.c omnifunc.c omnibuiltins.c omnirun.c omnireadline.c omnireadline_keybinds.c -o omnishell -lreadline
+gcc omnishell.c omnifunc.c omniparser.c omnilauncher.c omnicommands.c omnibuiltins.c omnirun.c omnireadline.c omnireadline_keybinds.c -o omnishell -lreadline
 ```
 
 It does not accept program arguments, multiple source files, include paths, library paths, preprocessor definitions, optimization flags, build manifests, or dependency graphs. Project/build-system detection, directory scanning, and automatic language detection outside the explicit `omnirun` builtin are also outside v0.1.
@@ -274,10 +285,16 @@ It does not accept program arguments, multiple source files, include paths, libr
 | --- | --- |
 | `omnishell.c` | Program entry point; starts the shell loop. |
 | `omnishell.h` | Shared semantic terminal-color definitions. |
-| `omnifunc.c` | Shell loop, startup banner, prompt construction, parsing, execution control, external process launching, and current-directory display. |
+| `omnifunc.c` | Shell loop, startup banner, prompt construction, and current-directory display. |
 | `omnifunc.h` | Shared shell macros, dependencies, and public shell-control declarations. |
-| `omnibuiltins.c` | Private builtin registration tables, dispatch, and the small `cd`, `help`, `pwd`, `history`, and `exit` implementations. |
-| `omnibuiltins.h` | Public builtin declarations and OmniRun interface dependency. |
+| `omniparser.c` | Tokenization, token locations, semantic classification, and token cleanup. |
+| `omniparser.h` | Parser token types, metadata structures, and public parser declarations. |
+| `omnilauncher.c` | Command-section argv preparation, builtin execution context, pipelines, redirection, fork/exec, descriptor ownership, and child waiting. |
+| `omnilauncher.h` | Public execution entry points used by the shell loop. |
+| `omnicommands.c` | Authoritative builtin names plus exact builtin and executable-command discovery. |
+| `omnicommands.h` | Public shared-command discovery declarations and ownership contracts. |
+| `omnibuiltins.c` | Private builtin function table, public dispatch boundary, and `cd`, `help`, `pwd`, `history`, `echo`, and `exit` implementations. |
+| `omnibuiltins.h` | Public builtin declarations and dispatcher interface. |
 | `omnireadline.c` | Readline initialization, input collection, GNU History initialization and persistence, and addition of accepted non-empty commands to history memory. |
 | `omnireadline_keybinds.c` | Custom TAB completion plus Up/Down prefix-history keybindings. |
 | `omnirun.c` | OmniRun validation, extension/tool selection, output naming, collision protection, compiler/interpreter execution, process-result handling, and cleanup. |
@@ -293,8 +310,8 @@ The goal is to build and understand a reliable foundation, then use that foundat
 
 ## Known Limitations
 
-- Whitespace-only tokenization; no quote or backslash interpretation.
-- No pipelines, redirection, globbing, background jobs, or job control.
+- Double quotes are recognized, but single quotes and backslash escaping are not interpreted.
+- No globbing, background jobs, or job control.
 - External command status is not exposed as a shell variable.
 - OmniRun accepts one source file and no program arguments.
 - OmniRun supports only `.py`, `.c`, and `.cpp`.

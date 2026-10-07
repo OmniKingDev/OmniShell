@@ -40,7 +40,9 @@ Different test names normally receive separate fake homes and clean history stat
 
 Terminal assertions inspect captured output after ANSI and Readline control sequences are removed. File assertions inspect the raw temporary `.omnish_history` directly, including exact line counts used to detect duplicated entries.
 
-The suite exercises GNU History as real integration behavior rather than mocking it. Current history lifecycle coverage verifies:
+The suite also exercises launcher behavior through the complete shell process. It verifies standalone and pipeline builtins, single and multiple pipelines, input/output/append redirection, combined pipeline redirection, restored parent descriptors, malformed syntax, and continued shell operation after errors.
+
+GNU History is exercised as real integration behavior rather than mocked behavior. Current history lifecycle coverage verifies:
 
 - Commands from the current session remain ordered in the `history` builtin.
 - Existing `.omnish_history` entries load into GNU History memory.
@@ -50,6 +52,6 @@ The suite exercises GNU History as real integration behavior rather than mocking
 - History is recreated from memory if its file is deleted during a running session.
 - Invalid `history` arguments report an error without terminating OmniShell.
 
-Each assertion compares an expected result with actual output, submitted-line behavior, process status, terminal bytes, or filesystem state. Every test prints `PASS` or `FAIL`; the final counters summarize the run. The current suite completes with `30 passed` and `0 failed`. The script exits with status `0` only when all tests pass, allowing it to be used by another script or future continuous-integration system.
+Each assertion compares an expected result with actual output, submitted-line behavior, process status, terminal bytes, or filesystem state. Every test prints `PASS` or `FAIL`; the final counters summarize the run. The current suite completes with `36 passed` and `0 failed`. The script exits with status `0` only when all tests pass, allowing it to be used by another script or future continuous-integration system.
 
 OmniShell uses a Bash harness plus a Python standard-library PTY helper because its most important behavior crosses the terminal, shell, builtin, compiler, interpreter, filesystem, history, and child-process boundaries. No third-party test framework is required. This keeps the arrange, execute, capture, and compare steps readable while the project is still small. A C framework such as Munit may become useful later when OmniShell has more isolated pure/helper functions that benefit from direct unit tests.

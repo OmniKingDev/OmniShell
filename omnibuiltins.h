@@ -1,22 +1,15 @@
-#ifndef OMNIBUILTINS_H
-#define OMNIBUILTINS_H
+#pragma once
 
-#include "omnirun.h"
-
-#include <string.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <errno.h>
-
-int omnish_cd(char **args);
-int omnish_help(char **args);
-int omnish_exit(char **args);
-int omnish_pwd(char **args);
-int omnish_history(char **args);
-int omnish_echo(char **args);
-
-int omnish_num_builtins(void);
-int omnish_run_builtin(char **program);
-
+#ifndef OMNISHELL_H
+    #include "omnishell.h"
 #endif
+
+int osh_cd(char **args);
+int osh_help(char **args);
+int osh_exit(char **args);
+int osh_pwd(char **args);
+int osh_history(char **args);
+int osh_echo(char **args);
+
+int osh_num_builtins(void);
+int osh_run_builtin(char **args);

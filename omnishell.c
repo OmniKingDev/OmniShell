@@ -1,5 +1,4 @@
 #include "omnifunc.h"
-#include <stdlib.h>
 
 int main(void) {
 
@@ -9,7 +8,7 @@ int main(void) {
      * - Run Command Loop
      */
     // Main Shell Function
-    omnish();
+    osh();
 
     // Perform Any Shutdown/Cleanup on shell function
 

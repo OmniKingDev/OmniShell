@@ -1,7 +1,9 @@
 #define _POSIX_C_SOURCE 200809L
 
-#include "omnirun.h"
+// Holds All Includes For Shell
 #include "omnishell.h"
+
+#include "omnirun.h"
 
 // All Supported Compiler(s) & Interpreter(s)
 static const char *commands[] = {
@@ -11,22 +13,22 @@ static const char *commands[] = {
 };
 
 /** Static-ONLY Prototype Fucntions **/
-static void omnirun_print_usage(void);
-static int omnirun_is_supplied_command(const char *argument);
-static char *omnirun_supply_command(const char *extension);
-static const char *omnirun_extension(const char *path);
-static char *omnirun_output_path(const char *source, const char *extension);
-static char *omnirun_executable_path(const char *output);
-static omnirun_process_result omnirun_run_process(char *const program[]);
-static void omnirun_report_result(const char *program,
-                                  omnirun_process_result result);
-static void omnirun_remove_output(const char *output);
-static int omnirun_run_interpreted(const char *source, const char *interpreter);
-static int omnirun_run_compiled(const char *source, const char *compiler,
+static void osh_print_usage(void);
+static int osh_is_supplied_command(const char *argument);
+static char *osh_supply_command(const char *extension);
+static const char *osh_extension(const char *path);
+static char *osh_output_path(const char *source, const char *extension);
+static char *osh_executable_path(const char *output);
+static osh_process_result osh_run_process(char *const program[]);
+static void osh_report_result(const char *program,
+                                  osh_process_result result);
+static void osh_remove_output(const char *output);
+static int osh_run_interpreted(const char *source, const char *interpreter);
+static int osh_run_compiled(const char *source, const char *compiler,
                                 const char *extension);
 
 // Main 'omnirun' Function
-int omnish_omnirun(char **args)
+int osh_omnirun(char **args)
 {
     // 'struct stat' Is A Built-In Complex Struct Declared In '<sys/stat.h>'
     // Designed To Grab Metadata About A File(s) Attributes
@@ -36,30 +38,30 @@ int omnish_omnirun(char **args)
 
     // If Missing Needed Argument(s)
     if (args[1] == NULL) {
-        omnirun_print_usage();
+        osh_print_usage();
         return 1;
     }
 
     // Checks For Not Needed Commands/Flags AND/OR Interpreters
     // 'omnirun' Should Supply That Automatically
     if (args[2] != NULL) {
-        if (omnirun_is_supplied_command(args[1])) {
-            fprintf(stderr, OMNI_WARNING
-                    "omnish: omnirun supplies '%s' automatically; pass only the source/main file\n"
-                    OMNI_RESET,
+        if (osh_is_supplied_command(args[1])) {
+            fprintf(stderr, OSH_WARNING
+                    "osh: omnirun supplies '%s' automatically; pass only the source/main file\n"
+                    OSH_RESET,
                     args[1]);
         // Assuming User Added Flags AND/OR 'omnirun' Can't Supply Commands
         } else {
-            fprintf(stderr, OMNI_WARNING "omnish: omnish v0.1; omnirun accepts exactly one source file\n" OMNI_RESET);
+            fprintf(stderr, OSH_WARNING"osh: osh v0.1; omnirun accepts exactly one source file\n"OSH_RESET);
         }
         // Any Other Expectation Is Considered Improper Use
-        omnirun_print_usage();
+        osh_print_usage();
         return 1;
     }
 
     // 'stat' Function Gives Us A Struct Of The File
     if (stat(args[1], &source_status) == -1) {
-        fprintf(stderr, OMNI_ERROR "omnish: cannot access '%s': %s\n" OMNI_RESET, args[1], strerror(errno));
+        fprintf(stderr, OSH_ERROR"osh: cannot access '%s': %s\n"OSH_RESET, args[1], strerror(errno));
         return 1;
     }
 
@@ -67,15 +69,15 @@ int omnish_omnirun(char **args)
     // The 'stat' Struct '.st_mode' Field Is Used To Provide File Type
     // 'S_ISREG' Checks If File Given Is A Regular File
     if (!S_ISREG(source_status.st_mode)) {
-        fprintf(stderr, OMNI_ERROR "omnish: '%s' is not a regular file\n" OMNI_RESET, args[1]);
+        fprintf(stderr, OSH_ERROR"osh: '%s' is not a regular file\n"OSH_RESET, args[1]);
         return 1;
     }
 
     // Return String Of File Extension Only
     // Exp: ".c" , ".py" , ".cpp"
-    extension = omnirun_extension(args[1]);
+    extension = osh_extension(args[1]);
     if (!extension) {
-        fprintf(stderr, OMNI_ERROR "omnish: '%s' has no file extension\n" OMNI_RESET, args[1]);
+        fprintf(stderr, OSH_ERROR"osh: '%s' has no file extension\n"OSH_RESET, args[1]);
         return 1;
     }
 
@@ -89,34 +91,34 @@ int omnish_omnirun(char **args)
 
     // Find File Type In Supplied Built-In Shell Types
     if (strcmp(extension, ".py") == 0) {
-        return omnirun_run_interpreted(args[1], omnirun_supply_command(extension));
+        return osh_run_interpreted(args[1], osh_supply_command(extension));
     }
     if (strcmp(extension, ".c") == 0) {
-        return omnirun_run_compiled(args[1], omnirun_supply_command(extension), extension);
+        return osh_run_compiled(args[1], osh_supply_command(extension), extension);
     }
     if (strcmp(extension, ".cpp") == 0) {
-        return omnirun_run_compiled(args[1], omnirun_supply_command(extension), extension);
+        return osh_run_compiled(args[1], osh_supply_command(extension), extension);
     }
 
     // If No Supported File Extension Is Found
-    fprintf(stderr, OMNI_ERROR "omnish: unsupported file extension '%s'\n" OMNI_RESET, extension);
+    fprintf(stderr, OSH_ERROR"osh: unsupported file extension '%s'\n"OSH_RESET, extension);
     return 1;
 }
 
 // Function To Print Usage
-static void omnirun_print_usage(void)
+static void osh_print_usage(void)
 {
-    fprintf(stderr, OMNI_WARNING
+    fprintf(stderr, OSH_WARNING
             "Usage: omnirun <file>\n"
             "examples:\n"
             "  - omnirun foo.py\n"
             "  - omnirun bar.c\n"
             "  - omnirun baz.cpp\n"
-            OMNI_RESET);
+            OSH_RESET);
 }
 
 // Function To Store And Check For Supplied Commands
-static int omnirun_is_supplied_command(const char *argument)
+static int osh_is_supplied_command(const char *argument)
 {
     // Count Of Array Of Supplied Commands
     size_t command_count = sizeof(commands) / sizeof(commands[0]);
@@ -130,7 +132,7 @@ static int omnirun_is_supplied_command(const char *argument)
     return 0;
 }
 
-static char *omnirun_supply_command(const char *extension)
+static char *osh_supply_command(const char *extension)
 {
     // Return Supply Command
     if (strcmp(extension, ".py") == 0) {
@@ -146,7 +148,7 @@ static char *omnirun_supply_command(const char *extension)
 }
 
 // Function To Walk And Grab File Extension
-static const char *omnirun_extension(const char *path)
+static const char *osh_extension(const char *path)
 {
     // Check String For The LAST '/' & '.' In The Path Given
     // 'strrchr' Locates A Character Within A String
@@ -161,30 +163,34 @@ static const char *omnirun_extension(const char *path)
     return dot;
 }
 
-static int omnirun_run_interpreted(const char *source, const char *interpreter)
+static int osh_run_interpreted(const char *source, const char *interpreter)
 {
     // Set Array Of Strings For 'execvp' Function
-    char *program[] = {(char *)interpreter, (char *)source, NULL};
-    omnirun_process_result result = omnirun_run_process(program);
+    char *program[] = {
+        (char *)interpreter,
+        (char *)source,
+        NULL
+    };
+    osh_process_result result = osh_run_process(program);
 
-    omnirun_report_result(interpreter , result);
+    osh_report_result(interpreter , result);
     return 1;
 }
 
-static int omnirun_run_compiled(const char *source, const char *compiler,
+static int osh_run_compiled(const char *source, const char *compiler,
                                 const char *extension)
 {
-    omnirun_process_result compile_result;
-    omnirun_process_result run_result;
+    osh_process_result compile_result;
+    osh_process_result run_result;
 
     // Brings Back Source File Name Without The Extension Attached
-    char *output = omnirun_output_path(source, extension);
+    char *output = osh_output_path(source, extension);
 
     char *executable;
     int output_fd;
 
     if (!output) {
-        fprintf(stderr, OMNI_ERROR "omnish: could not derive an output path from '%s'\n" OMNI_RESET,
+        fprintf(stderr, OSH_ERROR"osh: could not derive an output path from '%s'\n"OSH_RESET,
                 source);
         return 1;
     }
@@ -195,12 +201,12 @@ static int omnirun_run_compiled(const char *source, const char *compiler,
     output_fd = open(output, O_WRONLY | O_CREAT | O_EXCL, S_IRWXU);
     if (output_fd == -1) {
         if (errno == EEXIST) {
-            fprintf(stderr, OMNI_WARNING
-                    "omnish: output path '%s' already exists; refusing to overwrite it\n"
-                    OMNI_RESET,
+            fprintf(stderr, OSH_WARNING
+                    "osh: output path '%s' already exists; refusing to overwrite it\n"
+                    OSH_RESET,
                     output);
         } else {
-            fprintf(stderr, OMNI_ERROR "omnish: cannot create output '%s': %s\n" OMNI_RESET,
+            fprintf(stderr, OSH_ERROR"osh: cannot create output '%s': %s\n"OSH_RESET,
                     output, strerror(errno));
         }
         free(output);
@@ -218,35 +224,38 @@ static int omnirun_run_compiled(const char *source, const char *compiler,
             NULL
         };
 
-        compile_result = omnirun_run_process(compile_program);
+        compile_result = osh_run_process(compile_program);
     }
 
     // If Not Successful Compiling Of Program
-    if (compile_result.outcome != OMNIRUN_PROCESS_SUCCESS) {
+    if (compile_result.outcome != OSH_PROCESS_SUCCESS) {
         // Prints Error Results And The Cause
-        omnirun_report_result(compiler, compile_result);
+        osh_report_result(compiler, compile_result);
         // Delete The Program From File-System
         // So No Evidence Of Executable Used Exist After Failed Execution
-        omnirun_remove_output(output);
+        osh_remove_output(output);
         free(output);
         return 1;
     }
 
     // Create Executable Path After Compiled Requested Program Exist
-    executable = omnirun_executable_path(output);
+    executable = osh_executable_path(output);
     if (!executable) {
-        omnirun_remove_output(output);
+        osh_remove_output(output);
         free(output);
         return 1;
     }
 
     {
-        char *run_program[] = {executable, NULL};
+        char *run_program[] = {
+            executable,
+            NULL
+        };
 
         // Execute New Path To Compiled Program
-        run_result = omnirun_run_process(run_program);
+        run_result = osh_run_process(run_program);
     }
-    omnirun_report_result(executable, run_result);
+    osh_report_result(executable, run_result);
 
     // Free Everything Once Completed
     /* NOTE:
@@ -260,7 +269,7 @@ static int omnirun_run_compiled(const char *source, const char *compiler,
     return 1;
 }
 
-static char *omnirun_output_path(const char *source, const char *extension)
+static char *osh_output_path(const char *source, const char *extension)
 {
     // Number Of Characters Used For Name Of Executable
     size_t output_length = (size_t)(extension - source);
@@ -272,7 +281,7 @@ static char *omnirun_output_path(const char *source, const char *extension)
 
     output = malloc(output_length + 1);
     if (!output) {
-        fprintf(stderr, OMNI_ERROR "omnish: failed to allocate output path\n" OMNI_RESET);
+        fprintf(stderr, OSH_ERROR"osh: failed to allocate output path\n"OSH_RESET);
         return NULL;
     }
 
@@ -281,7 +290,7 @@ static char *omnirun_output_path(const char *source, const char *extension)
     return output;
 }
 
-static char *omnirun_executable_path(const char *output)
+static char *osh_executable_path(const char *output)
 {
     size_t path_size;
     char *path;
@@ -291,7 +300,7 @@ static char *omnirun_executable_path(const char *output)
         path_size = strlen(output) + 1;
         path = malloc(path_size);
         if (!path) {
-            fprintf(stderr, OMNI_ERROR "omnish: failed to allocate executable path\n" OMNI_RESET);
+            fprintf(stderr, OSH_ERROR"osh: failed to allocate executable path\n"OSH_RESET);
             return NULL;
         }
         memcpy(path, output, path_size);
@@ -301,7 +310,7 @@ static char *omnirun_executable_path(const char *output)
     path_size = strlen(output) + 3;
     path = malloc(path_size);
     if (!path) {
-        fprintf(stderr, OMNI_ERROR "omnish: failed to allocate executable path\n" OMNI_RESET);
+        fprintf(stderr, OSH_ERROR"osh: failed to allocate executable path\n"OSH_RESET);
         return NULL;
     }
     // Assuming Executable Is In Current Directory Where 'omnirun' Was Used
@@ -309,36 +318,36 @@ static char *omnirun_executable_path(const char *output)
     return path;
 }
 
-static void omnirun_remove_output(const char *output)
+static void osh_remove_output(const char *output)
 {
     // 'unlink' Deletes The File Descriptor That Is No Longer Being Used
     // Removing Executable File From File-System
     if (unlink(output) == -1 && errno != ENOENT) {
-        fprintf(stderr, OMNI_ERROR "omnish: could not remove '%s': %s\n" OMNI_RESET,
+        fprintf(stderr, OSH_ERROR"osh: could not remove '%s': %s\n"OSH_RESET,
                 output, strerror(errno));
     }
 }
 
 // Function That Returns A Return Value Associated With Outcome Enums
-static omnirun_process_result omnirun_run_process(char *const program[])
+static osh_process_result osh_run_process(char *const program[])
 {
     // Return Process Result Declared If Failures Occur
-    omnirun_process_result result = {
-        .outcome = OMNIRUN_PROCESS_SETUP_FAILURE,
+    osh_process_result result = {
+        .outcome = OSH_PROCESS_SETUP_FAILURE,
         .value = 0
     };
     // Needed For Using 'pipe' & 'fork' Functions
-    int exec_error_pipe[2];
+    int pipe_fd[2];
     int status;
     pid_t pid;
     pid_t waited;
 
     // Create Read & Write End Pipes
     // Returns '-1' If 'pipe' Function Failed
-    // Parent Holds 'exec_error_pipe[0]', The Read File Descriptor
-    // Child Holds 'exec_error_pipe[1]', The Write File Descriptor
-    if (pipe(exec_error_pipe) == -1) {
-        perror("omnish: pipe");
+    // Parent Holds 'pipe_fd[0]', The Read File Descriptor
+    // Child Holds 'pipe_fd[1]', The Write File Descriptor
+    if (pipe(pipe_fd) == -1) {
+        perror("osh: pipe");
         return result;
     }
 
@@ -348,22 +357,22 @@ static omnirun_process_result omnirun_run_process(char *const program[])
     // 'FD_CLOEXEC' File Descriptor W/ Close-On-Exec Flag  ↓↓↓
     // Exec(any 'exec' family function) Flag Triggers 'FD_CLOEXEC'
     // Returns 0 On Successful
-    if (fcntl(exec_error_pipe[1], F_SETFD, FD_CLOEXEC) == -1) {
-        perror("omnish: fcntl");
+    if (fcntl(pipe_fd[1], F_SETFD, FD_CLOEXEC) == -1) {
+        perror("osh: fcntl");
         // Close Files If Failed
-        close(exec_error_pipe[0]);
-        close(exec_error_pipe[1]);
+        close(pipe_fd[0]);
+        close(pipe_fd[1]);
         return result;
     }
 
     // Create Child Process
     pid = fork();
     if (pid == -1) {
-        perror("omnish: fork");
-        close(exec_error_pipe[0]);
-        close(exec_error_pipe[1]);
+        perror("osh: fork");
+        close(pipe_fd[0]);
+        close(pipe_fd[1]);
         // Set Result To Created Enum Error For 'fork' Function
-        result.outcome = OMNIRUN_PROCESS_FORK_FAILURE;
+        result.outcome = OSH_PROCESS_FORK_FAILURE;
         return result;
     }
 
@@ -375,7 +384,7 @@ static omnirun_process_result omnirun_run_process(char *const program[])
 
         // Child Process Should Not Read From Pipe
         // Write End Already Set To Close After Success Of 'execvp'
-        close(exec_error_pipe[0]);
+        close(pipe_fd[0]);
 
         // Execute Program With 'program' Arguments
         execvp(program[0], program);
@@ -389,10 +398,10 @@ static omnirun_process_result omnirun_run_process(char *const program[])
         // Write Error Into Child's File Descriptor If Interruption Occured
         // 'EINTR' Sees If Call Was Interrupted By Signal Before Any Data Was Written
         // Loop Ensures All Data Is Written Before Closing Write-End Pipe
-        while (write(exec_error_pipe[1], &exec_err, sizeof(exec_err)) == -1
+        while (write(pipe_fd[1], &exec_err, sizeof(exec_err)) == -1
                && errno == EINTR) {
         }
-        close(exec_error_pipe[1]);
+        close(pipe_fd[1]);
         // '127' Error Status Code Means; "command not found"
         // '_exit' Exits Broken Child Without Cleaning Out Standard Parents I/O Buffers
         _exit(127);
@@ -400,7 +409,7 @@ static omnirun_process_result omnirun_run_process(char *const program[])
 
     // Parent Process Should Not Write To Pipe
     // Child Process Has Already Done So
-    close(exec_error_pipe[1]);
+    close(pipe_fd[1]);
 
     // Wait For Status Of Created Child Process
     // Loop Ensures That Parent Doesn't Stop Waiting Prematurely
@@ -409,9 +418,9 @@ static omnirun_process_result omnirun_run_process(char *const program[])
     } while (waited == -1 && errno == EINTR);
 
     if (waited == -1) {
-        perror("omnish: waitpid");
-        close(exec_error_pipe[0]);
-        result.outcome = OMNIRUN_PROCESS_WAIT_FAILURE;
+        perror("osh: waitpid");
+        close(pipe_fd[0]);
+        result.outcome = OSH_PROCESS_WAIT_FAILURE;
         return result;
     }
 
@@ -420,30 +429,30 @@ static omnirun_process_result omnirun_run_process(char *const program[])
 
     // Read Bytes From Parent File Descriptor
     do {
-        bytes_read = read(exec_error_pipe[0], &exec_error, sizeof(exec_error));
+        bytes_read = read(pipe_fd[0], &exec_error, sizeof(exec_error));
     } while (bytes_read == -1 && errno == EINTR);
     // No Longer Need File Descriptors
-    close(exec_error_pipe[0]);
+    close(pipe_fd[0]);
 
     // IF 'exec_error' Equals The Error In Bytes Read
     // That Means 'execvp' Failed
     if (bytes_read == (ssize_t)sizeof(exec_error)) {
         // Reset The Value Of 'errno'
         errno = exec_error;
-        perror("omnish: execvp");
+        perror("osh: execvp");
         // Log Result Of Error Read
-        result.outcome = OMNIRUN_PROCESS_EXEC_FAILURE;
+        result.outcome = OSH_PROCESS_EXEC_FAILURE;
         result.value = exec_error;
         return result;
     }
     // If 'read' Returns An Error
     if (bytes_read == -1) {
-        perror("omnish: read");
+        perror("osh: read");
         return result;
     }
     // If Child Was Terminated By A Signal
     if (WIFSIGNALED(status)) {
-        result.outcome = OMNIRUN_PROCESS_SIGNAL_TERMINATION;
+        result.outcome = OSH_PROCESS_SIGNAL_TERMINATION;
         // 'WTERMSIG' Gives Number Of Signal That Terminated Child
         result.value = WTERMSIG(status);
         return result;
@@ -455,40 +464,40 @@ static omnirun_process_result omnirun_run_process(char *const program[])
         result.value = WEXITSTATUS(status);
         // 
         result.outcome = result.value == 0
-            ? OMNIRUN_PROCESS_SUCCESS
-            : OMNIRUN_PROCESS_EXIT_FAILURE;
+            ? OSH_PROCESS_SUCCESS
+            : OSH_PROCESS_EXIT_FAILURE;
         return result;
     }
 
     return result;
 }
 
-static void omnirun_report_result(const char *program,
-                                  omnirun_process_result result)
+static void osh_report_result(const char *program,
+                                  osh_process_result result)
 {
     switch (result.outcome) {
-        case OMNIRUN_PROCESS_EXIT_FAILURE:
-            fprintf(stderr, OMNI_ERROR "omnish: %s exited with status %d\n" OMNI_RESET,
+        case OSH_PROCESS_EXIT_FAILURE:
+            fprintf(stderr, OSH_ERROR"osh: %s exited with status %d\n"OSH_RESET,
                     program, result.value);
             break;
-        case OMNIRUN_PROCESS_SIGNAL_TERMINATION:
-            fprintf(stderr, OMNI_ERROR "omnish: %s terminated by signal %d\n" OMNI_RESET,
+        case OSH_PROCESS_SIGNAL_TERMINATION:
+            fprintf(stderr, OSH_ERROR"osh: %s terminated by signal %d\n"OSH_RESET,
                     program, result.value);
             break;
-        case OMNIRUN_PROCESS_SETUP_FAILURE:
-            fprintf(stderr, OMNI_ERROR "omnish: %s failed by 'pipe' function %d\n" OMNI_RESET,
+        case OSH_PROCESS_SETUP_FAILURE:
+            fprintf(stderr, OSH_ERROR"osh: %s failed by 'pipe' function %d\n"OSH_RESET,
                     program, result.value);
             break;
-        case OMNIRUN_PROCESS_FORK_FAILURE:
-            fprintf(stderr, OMNI_ERROR "omnish: %s failed by 'fork' function %d\n" OMNI_RESET,
+        case OSH_PROCESS_FORK_FAILURE:
+            fprintf(stderr, OSH_ERROR"osh: %s failed by 'fork' function %d\n"OSH_RESET,
                     program, result.value);
             break;
-        case OMNIRUN_PROCESS_WAIT_FAILURE:
-            fprintf(stderr, OMNI_ERROR "omnish: %s failed by 'wait' function %d\n" OMNI_RESET,
+        case OSH_PROCESS_WAIT_FAILURE:
+            fprintf(stderr, OSH_ERROR"osh: %s failed by 'wait' function %d\n"OSH_RESET,
                     program, result.value);
             break;
-        case OMNIRUN_PROCESS_EXEC_FAILURE:
-            fprintf(stderr, OMNI_ERROR "omnish: %s failed by 'execvp' function %d\n" OMNI_RESET,
+        case OSH_PROCESS_EXEC_FAILURE:
+            fprintf(stderr, OSH_ERROR"osh: %s failed by 'execvp' function %d\n"OSH_RESET,
                     program, result.value);
             break;
         default:

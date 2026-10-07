@@ -45,11 +45,13 @@ if [[ -e "$OMNISHELL" || -L "$OMNISHELL" ]]; then
     printf 'OmniShell is already built. Run: ./omnishell\n'
     exit 0
 fi
-
 # OmniShell Compile Command To Run For User
-gcc -std=c17 -Wall -Wextra -Wpedantic \
+clang -std=c17 -fsanitize=address -Wall -Wextra -Wpedantic \
     "$SCRIPT_DIR/omnishell.c" \
     "$SCRIPT_DIR/omnifunc.c" \
+    "$SCRIPT_DIR/omniparser.c" \
+    "$SCRIPT_DIR/omnilauncher.c" \
+    "$SCRIPT_DIR/omnicommands.c" \
     "$SCRIPT_DIR/omnibuiltins.c" \
     "$SCRIPT_DIR/omnirun.c" \
     "$SCRIPT_DIR/omnireadline.c" \

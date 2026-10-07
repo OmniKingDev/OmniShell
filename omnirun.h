@@ -1,15 +1,8 @@
-#ifndef OMNIRUN_H
-#define OMNIRUN_H
+#pragma once
 
-#include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
+#ifndef OMNISHELL_H
+    #include "omnishell.h"
+#endif
 
 // Set Enums For Execution Outcomes
 // MUST BE IN THIS ORDER
@@ -19,23 +12,21 @@
 // Other Enums
 // ↓ ↓ ↓
 // 'OMNIRUN_PROCESS_SETUP_FAILURE' At Index 6
-typedef enum Omnirun_Process_Type {
-    OMNIRUN_PROCESS_SUCCESS,
-    OMNIRUN_PROCESS_EXIT_FAILURE,
-    OMNIRUN_PROCESS_FORK_FAILURE,
-    OMNIRUN_PROCESS_EXEC_FAILURE,
-    OMNIRUN_PROCESS_WAIT_FAILURE,
-    OMNIRUN_PROCESS_SIGNAL_TERMINATION,
-    OMNIRUN_PROCESS_SETUP_FAILURE
-} omnirun_process_t;
+typedef enum OshrunProcessType {
+    OSH_PROCESS_SUCCESS,
+    OSH_PROCESS_EXIT_FAILURE,
+    OSH_PROCESS_FORK_FAILURE,
+    OSH_PROCESS_EXEC_FAILURE,
+    OSH_PROCESS_WAIT_FAILURE,
+    OSH_PROCESS_SIGNAL_TERMINATION,
+    OSH_PROCESS_SETUP_FAILURE
+} osh_process_t;
 
 // Struct To Associate Outcome Enum W/
 // Return Value/Exit Code Given By Program Ran
-typedef struct OmnirunProcessResult {
-    omnirun_process_t outcome;
+typedef struct OshProcessResult {
+    osh_process_t outcome;
     int value;
-} omnirun_process_result;
+} osh_process_result;
 
-int omnish_omnirun(char **args);
-
-#endif
+int osh_omnirun(char **args);
