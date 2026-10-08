@@ -1,109 +1,102 @@
-#define _POSIX_C_SOURCE 200809L
-
-// Main Shell Functions (REPL)
-#include "omnifunc.h"
+// Holds All Language/POSIX Headers For Shell
 #include "omnishell.h"
 
-// Shell Builtins Header File
-#include "omnibuiltins.h"
+// All Other 'osh*' Made Functions
+// More Info On Functions Are In 'osh*.c' Files
+#include "omnifunc.h"
+#include "omnilauncher.h"
+#include "omnireadline.h"
+#include "omniparser.h"
 
-// Prototypes
-static char *omnish_prompt_path(const char *current_dir);
-static void omnish_init_readline(void);
-static void omnish_print_banner(void);
+/* Prototypes That 'osh()' Uses */
+//  NOTE: More Info On Functions Are Below
+static char *osh_prompt_path(const char *current_dir);
+static char *osh_complete_prompt_path(char *dir);
+static void osh_print_banner(void);
 
 // Used In omnishell.c To Launch Shell
-void omnish(void)
+// Main shell function
+void osh(void)
 {
-    // Set Variables To Take In Arguments
+    // Used For Prompt To Show User
+    char *current_dir_prompt;
+
     // For Functions Later Used To Readline
-    // Displaying Current Directory User Is In
     char *line;
-    char **argv;
-    char *current_dir;
-    char *display_dir;
+
+    // Used To Take In Tokenized Entry
+    OSHToken *argv;
+
+    // Status Of Execution For Loop
     int status;
 
-    // Initialize Keybinds Readline Provides
-    omnish_init_readline();
-    omnish_print_banner();
+    // Initialize Readline's Interactive Mode Including Custom Keybinds
+    osh_init_readline();
 
-    // Start Loop
+    // Initialize History Library Features
+    osh_init_history();
+
+    // Print Custom Banner
+    // osh_print_banner();
+
+    // Start Shell (REPL) Loop
     do {
-        current_dir = omnish_cwd();
-        // Just In-case 'omnish_cwd' Returns Nothing
-        if (!current_dir) {
+        // Grab Absolute Path Of Current User Directory
+        // Then Update The Directories To Limit What Is Shown To User
+        // 'osh_cwd()' Grabs Absolute Path Of Current Working Directory
+        // 'osh_complete_prompt_path()' Shortens The Path If It Exceeds Limit
+        // Limit Is 5
+        current_dir_prompt = osh_complete_prompt_path(osh_cwd());
+
+        // Just In-case 'osh_complete_prompt_path()' Returns Nothing
+        if (!current_dir_prompt) {
+            fprintf(stderr, OSH_ERROR"osh: Function 'osh()':\nOsh failed to create prompt for Readline\n"OSH_RESET);
+            free(current_dir_prompt);
             return;
         }
 
-        // Returns Shorter Version Of Current Working Directory Path
-        // ONLY If Path Exceeds Set Limit For Directories Shown
-        display_dir = omnish_prompt_path(current_dir);
-        if (!display_dir) {
-            free(current_dir);
-            return;
-        }
+        // Then Hand Over Generated Prompt To Use In Custom 'osh_readline()' Function
+        line = osh_readline(current_dir_prompt);
 
-        /* NOTE:
-         *  All 'omni*' Made Functions Are Declared In Header File 'omnifunc.h'
-         *  EXCEPT For Any Function With A 'static' Type Remains In This File
-         */
+        // Free Prompt Once 'osh_readline()' Has Returned A 'line'
+        // To Later Generate A New Prompt For User
+        free(current_dir_prompt);
 
-        // Prompt User
-        char *omnish_prompt = "\n\001" OMNI_BRPINK "\002omnishellv0.1\001" OMNI_RESET "\002 ==> ";
-        size_t prompt_size = strlen(display_dir) + strlen(omnish_prompt) + 1;
-
-        char *prompt = malloc(prompt_size);
-
-        if (!prompt) {
-            free(display_dir);
-            free(current_dir);
-            return;
-        }
-
-        // Final Prompt User Sees
-        snprintf(prompt, prompt_size, "%s%s", display_dir, omnish_prompt);
-
-        // Free Memory After Use
-        free(display_dir);
-        free(current_dir);
-
-        // Then Hand Prompt To Use In 'readline' Function
-        line = omnish_read_line(prompt);
-        free(prompt);
-        // If 'omnish_read_line' Returns NULL
-        // Close Shell Loop
+        // If 'osh_readline()' Returns NULL
+        // Break Out Of Shell Loop
         if (!line) {
+            fprintf(stderr, OSH_ERROR"osh: Function 'osh()':\nReadline failed to return a line\n"OSH_RESET);
             break;
         }
 
-        // Then Parse Line To Separate Commands
-        argv = omnish_split_line(line);
+        // Lexical Analysis On Given Line
+        argv = osh_tokenizer(line);
 
-        // Grab Status To Confirm Execution Of Arguments
-        status = omnish_execute(argv);
+        // Execute Parsed Line Only Returning Status Of 'osh_execute()'
+        // NOT The Line's Status Itself
+        status = osh_execute(argv);
 
-        // Free Up Memory Used To Execute Arguments
+        // Free Up Memory Used To Recieve User Line
         free(line);
-        free(argv);
 
+    // Check Status To Determine If Shell Continues Looping
     } while (status);
+
+    // Upload Current Session History Into Persistent Shell File
+    osh_end_history();
 }
 
-/* NOTE: All Functions OmniShell Utilizes */
 
-// Read Line Initialization
-static void omnish_init_readline(void)
-{
-    // Call Readline's Default Keybinds
-    // Creating Readline To Be Interactive
-    rl_initialize();
-}
+/*  NOTE:
+ *  Functions To Build Directories Displayed For User
+ *  Including Print Banner On Printed On Every Launch
+ */
 
-static void omnish_print_banner(void)
+// Custom ASCII Banner To Print
+static void osh_print_banner(void)
 {
     printf(
-OMNI_BRPINK
+OSH_BRPINK
 " ▒█████   ███▄ ▄███▓ ███▄    █  ██▓  ██████  ██░ ██ ▓█████  ██▓     ██▓    \n"
 "▒██▒  ██▒▓██▒▀█▀ ██▒ ██ ▀█   █ ▓██▒▒██    ▒ ▓██░ ██▒▓█   ▀ ▓██▒    ▓██▒    \n"
 "▒██░  ██▒▓██    ▓██░▓██  ▀█ ██▒▒██▒░ ▓██▄   ▒██▀▀██░▒███   ▒██░    ▒██░    \n"
@@ -113,253 +106,208 @@ OMNI_BRPINK
 "  ░ ▒ ▒░ ░  ░      ░░ ░░   ░ ▒░ ▒ ░░ ░▒  ░ ░ ▒ ░▒░ ░ ░ ░  ░░ ░ ▒  ░░ ░ ▒  ░\n"
 "░ ░ ░ ▒  ░      ░      ░   ░ ░  ▒ ░░  ░  ░   ░  ░░ ░   ░     ░ ░     ░ ░   \n"
 "    ░ ░         ░            ░  ░        ░   ░  ░  ░   ░  ░    ░  ░    ░  ░\n"
-OMNI_BRPURPLE
-"                         OmniShell v0.1                                    \n"
+OSH_BRPURPLE
+"                         OmniShell v0.2                                    \n"
 "             Welcome To The First Version Of OmniShell!!!                  \n"
-OMNI_RESET);
-}
-
-// Read From Stdin function
-char *omnish_read_line(const char *prompt)
-{
-    /* Get Line To Parse */
-    static char *line = NULL;
-
-    // Get Line Read
-    /*  NOTE: --> 'readline' Specifically Waits For User To Input A Command
-     *              Even If Input Is An Empty Strings
-     */
-    line = readline(prompt);
-    if (!line) {
-        return NULL;
-    }
-
-    // Return If 'readline' Was Successful And Not An Empty String
-    if (line && *line) {
-        add_history(line);
-        omnish_store_line(line);
-    }
-    return line;
-}
-
-// Function Tokenizing Line (Parsing)
-char **omnish_split_line(char *line) {
-    /* Parse Line Given Into Separate Tokens */
-
-    // 'position' And 'bufsiz' Are Both Integers
-    int bufsiz = OMNI_TOK_BUFSIZ;
-    int position = 0;
-
-    // Malloc For Each Token
-    char **tokens = malloc(sizeof(char *) * bufsiz);
-    char *token;
-    if (!tokens) {
-        fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed To Allocate Memory\n" OMNI_RESET);
-        exit(EXIT_FAILURE);
-    }
-
-    // Function 'strtok' To Parse/Tokenize Line
-    token = strtok(line, OMNI_TOK_DELIM);
-    while (token != NULL) {
-        tokens[position] = token;
-        position++;
-
-        // Increase Tokens Size With More Pointers To SET Buffer
-        // ONLY If 'position' Exceeds 'bufsiz'
-        if (position >= bufsiz) {
-            bufsiz += OMNI_TOK_BUFSIZ;
-            char **new_tokens;
-
-            new_tokens = realloc(tokens, bufsiz * sizeof(char *));
-            if (!new_tokens) {
-                fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed To Re-Allocate Memory\n" OMNI_RESET);
-                free(tokens);
-                exit(EXIT_FAILURE);
-            }
-            tokens = new_tokens;
-        }
-        // 'strtok' Must Be Called Twice In-order To Continue Parsing Same 'line'
-        // Setting Pointer To NULL Tells 'strtok' To Use 'line'; Utilizing Hidden Pointers
-        // Setting the Pointer To NULL; NOT 'line' Itself
-        // Loops Back To First Call To 'strtok' Grabbing Next Token In 'line'
-        token = strtok(NULL, OMNI_TOK_DELIM);
-    }
-    // Terminate Then Return List With NULL At The End
-    // 'execvp' Expects 'tokens' Array To End With NULL
-    tokens[position] = NULL;
-    return tokens;
-}
-
-// Execute Each Token Function
-int omnish_launch_program(char **tokens)
-{
-    // Declare 'pid' Capable Of Holding a PID
-    pid_t pid;
-    pid_t wpid;
-    // Declare Status For 'waitpid' Function
-    int status;
-
-    // 'fork' Creates A Child Process Within Parent Process
-    // Child Return Value Is 0 As Type 'pid_t' If Successful
-    pid = fork();
-    if (pid == 0) {
-        // 'execvp' Gets Tokens Previously Parsed Then Executes
-        // The First Token Must Be Program Name
-        // 'v' Stands For Vectors, Token List Of Arguments
-        // 'p' Is For PATH (OS finds program path through $PATH)
-        if (execvp(tokens[0], tokens) == -1) {
-            // Prints Error Given By The Library or Function
-            // Allowing User To Be Guided To Source Problem
-            // Giving Main Function Name
-            perror("omnish");
-            // '_exit' The Child's Original Process Image (Copy Of Shell Program(Parent Process))
-            // NOT The Shell Program(Parent) The Child Was Created In
-            _exit(EXIT_FAILURE);
-        }
-    } else if (pid < 0) {
-        perror("omnish");
-    } else {
-        // Results Of Child Process
-        // 'WUNTRACED' Return If A Child Stopped
-        // Parent Waits For Child Process To Change State
-        do {
-            wpid = waitpid(pid, &status, WUNTRACED);
-            if (wpid == -1) {
-                perror("waitpid");
-                return -1;
-            }
-        // Loop While Status Doesn't Signify A Properly
-        // Exited Or Signaled Terminated Child Process
-        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-    }
-    // Return 1 After Success Of Execution
-    return 1;
-}
-
-// Execute Either Builtins Or System Programs
-int omnish_execute(char **program)
-{
-    // Set Integer For Status
-    int builtin_status;
-
-    // If No User Input, Prompt User
-    if (program[0] == NULL) {
-        return 1;
-    }
-
-    // 'omnish_run_builtin' Function In omnibuiltins.h
-    builtin_status = omnish_run_builtin(program);
-
-    // Builtin Function Was Found
-    if (builtin_status != -1) {
-        return builtin_status;
-    }
-
-    // Launch System Program If Not Builtin
-    return omnish_launch_program(program);
+OSH_RESET);
 }
 
 // Function For Current Working Directory
-char *omnish_cwd(void)
+char *osh_cwd(void)
 {
-    // Allocate Memory For Directory String
-    size_t buffsize = OMNI_BUFSIZ;
-    char *buff = malloc(sizeof(char) * buffsize);
+    // Using Custom Buf. Size
+    size_t dir_size = DIR_BUFSIZ;
 
-    if (!buff) {
-        fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed\n" OMNI_RESET);
+    // Heap Memory For Directory Path
+    char *dir = malloc(sizeof(char) * dir_size);
+
+    // If Malloc Failed
+    if (!dir) {
+        // Reference The Function Where Error Occured
+        fprintf(stderr, OSH_ERROR "osh: Function 'osh_cwd()':\nMalloc failed to allocate memory\n" OSH_RESET);
+        // Return No Current Working Directory
         return NULL;
     }
 
-    /* AI Written Part - CODEX */
-    while (getcwd(buff, buffsize) == NULL) {
+    // Grab User Current Working Directory
+    while (getcwd(dir, dir_size) == NULL) {
+
         // If 'errno' Returns Anything Besides 'ERANGE'
-        if (errno != ERANGE) {
-            perror("omnish");
-            free(buff);
+        // Return Error Of Function Most Recently Used
+        // Free Heap Memory
+        // Return No Current Working Directory
+        if (errno != ERANGE) { perror("osh"); free(dir); return NULL; }
+
+        // If 'ERANGE' Returns As Error Than Resize Buff Of Directory Path
+        char *resized_dir;
+
+        // Add The Same Buff Size Into The Original Size, Doubling Size
+        dir_size += DIR_BUFSIZ;
+
+        // Realloc Heap Memory
+        resized_dir = realloc(dir, sizeof(char) * dir_size);
+
+        // If Realloc Failed
+        if (!resized_dir) {
+
+            // Reference The Function Where Error Occured
+            fprintf(stderr, OSH_ERROR "osh: Function 'osh_cwd()':\nMalloc failed to allocate memory\n" OSH_RESET);
+
+            // Free Heap Memory
+            free(dir);
+
+            // Return No Current Working Directory
             return NULL;
         }
 
-        char *resized_buff;
-
-        buffsize += OMNI_BUFSIZ;
-        resized_buff = realloc(buff, sizeof(char) * buffsize);
-        if (!resized_buff) {
-            fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed\n" OMNI_RESET);
-            free(buff);
-            return NULL;
-        }
-        buff = resized_buff;
+        // Replace Original Heap With New Heap
+        dir = resized_dir;
     }
-    /* AI Written Part - CODEX */
 
-    return buff;
+    // Return Absolute Path Of User Current Working Directory
+    return dir;
 }
 
-/*
-* AI Written Function 'omnish_prompt_path'
-* Developer Written Comments Of Function
-*/
-// Shorten Current Working Directory For Prompt
-static char *omnish_prompt_path(const char *current_dir)
+static char *osh_complete_prompt_path(char *dir)
 {
-    // Set Variables
-    int components = 0;
-    const char *position = current_dir;
-    const char *suffix = current_dir;
-    size_t display_size;
+    // For Current Directory User Is In
     char *display_dir;
 
-    // Check For The NUL Byte Character
-    // When Dereferencing Character Pointers
+    // Returns Shorter Version Of Current Working Directory Path
+    // ONLY If Path Exceeds Set Limit For Directories Shown
+    display_dir = osh_prompt_path(dir);
+
+    // Just In-case 'osh_prompt_path()' Returns Nothing
+    // Free Heap Memory
+    // Exit Shell Entirely
+    if (!display_dir) { free(dir); return NULL; }
+
+    /* NOTE:
+        *  All 'osh*' Made Functions Are Declared In Any Listed Header File At The Top
+        *  EXCEPT For Any Function With A 'static' Type Remains In This File
+    */
+
+    // Build User Custom Prompt
+    char *osh_prompt = "\n\001" OSH_BRPINK "\002omnishellv0.2\001" OSH_RESET "\002 ==> ";
+
+    // Size Of Both Current Directory Path With Custom Prompt
+    size_t prompt_size = strlen(display_dir) + strlen(osh_prompt) + 1;
+
+    // Heap Memory For Prompt To Display To User
+    char *prompt = malloc(prompt_size);
+
+    // If Malloc Failed
+    // Free Heap Memory
+    // Exit Shell Entirely
+    if (!prompt) { free(display_dir); free(dir); return NULL; }
+
+    // Generate Final Prompt User Sees
+    snprintf(prompt, prompt_size, "%s%s", display_dir, osh_prompt);
+
+    // Free Heap Memory That Are No Longer Needed
+    free(display_dir);
+    free(dir);
+
+    // Return Prompt For Readline To Use
+    return prompt;
+}
+
+// Limit Amount Of Directories To Display
+static char *osh_prompt_path(const char *current_dir)
+{
+    // To Keep Track Of Total Directories
+    int components = 0;
+
+    // Copy Absolute Directory
+    // Path For Calculating Full Directory Length
+    const char *position = current_dir;
+
+    // Copy Absolute Directory Path
+    // For Directories Being Returned
+    const char *suffix = current_dir;
+
+    // Set Limit Size
+    size_t display_size;
+
+    // Directory Path To Return
+    char *display_dir;
+
+    // Loop Until The NUL Byte Has Been Encountered
     while (*position != '\0') {
-        // If Character Does NOT Equal '/'
-        if (*position != '/' && (position == current_dir || position[-1] == '/')) {
-            components++;
-        }
-        // Only When '/' Is Found In String
+
+        // If Character Does NOT Equal '/' While The Character Before It Is '/'
+        if (*position != '/' && position[-1] == '/') { components++; }
+
+        // Look At Next Character In String
         position++;
     }
 
-    // 'components' Represents Folders To Be Seen
+    // If Current Directory Length Exceeds 5 Directories
     if (components > 5) {
-        int remaining = 3;
 
-        // Remove All Folder Names That Aren't The Last 3 Directories
-        // If Current Directory Length Exceeds 5 Directories
+        // Limit For Directories To Display
+        int DIR_LIMIT = 3;
+
+        // Change Position To Point At The End Of Current Working Directory
         position = current_dir + strlen(current_dir);
+
+        // Loop From The End To Start Of Current Working Directory
         while (position > current_dir) {
+
+            // Start Stepping Back In String
             position--;
+
+            // If '/' Is Found
             if (*position == '/') {
-                remaining--;
-                if (remaining == 0) {
-                    // Suffix Should Hold Index At The First Character
-                    // Of The Third To Last Directory
-                    suffix = position + 1;
-                    break;
-                }
+
+                // After Directory Is Found
+                DIR_LIMIT--;
+
+                // Once We Have 3 Directories
+                // Suffix Should Hold Index At The First Character
+                // Of The Third To Last Directory
+                // Break Out Of While Loop
+                if (DIR_LIMIT == 0) { suffix = position + 1; break; }
             }
         }
 
-        // '5' Is For The Extra Characters Printed First
-        // Before The Directories Are Displayed
+        // Length Of New Directory Path
         display_size = strlen(suffix) + 5;
+
+        // Malloc Heap Memory
         display_dir = malloc(sizeof(char) * display_size);
+
+        // If Malloc Failed
+        // Reference The Function Where Error Occured
+        // Return No Current Working Directory
         if (!display_dir) {
-            fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed\n" OMNI_RESET);
+            fprintf(stderr, OSH_ERROR "osh: Function 'osh_prompt_path()':\nMalloc failed to allocate memory\n" OSH_RESET);
             return NULL;
         }
+
+        // Copy New Directory Path With Ellipsis Reference
         snprintf(display_dir, display_size, ".../%s", suffix);
+
+        // Return Full Directory Path
         return display_dir;
     }
 
-    // If File Path Components Is Less Than OR Equal To 5
+    /* If File Path Components Is Less Than OR Equal To 5 */
+
+    // Grab Length Of Directory Path
     display_size = strlen(current_dir) + 1;
+
+    // Malloc Heap Memory
     display_dir = malloc(sizeof(char) * display_size);
-    if (!display_dir) {
-        fprintf(stderr, OMNI_ERROR "omnish: Malloc Failed\n" OMNI_RESET);
-        return NULL;
-    }
+
+    // If Malloc Failed
+    // Reference The Function Where Error Occured
+    // Return No Current Working Directory
+    if (!display_dir) { fprintf(stderr, OSH_ERROR "osh: Function 'osh_prompt_path()':\nMalloc failed to allocate memory\n" OSH_RESET); return NULL; }
+
+    // Copy Current Working Directory Into Malloced Heap Memory
     strcpy(display_dir, current_dir);
+
+    // Return Full Directory Path
     return display_dir;
 }

@@ -5,6 +5,7 @@
 # between what we expected and what the program actually produced.
 
 set -u
+# Allows Pipe To Report If Any Command In Pipe Failed
 set -o pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,6 +14,7 @@ TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/omnishell-tests.XXXXXX")"
 TEST_BINARY="$TEST_ROOT/omnishell-test"
 TEST_WORKSPACE="$TEST_ROOT/workspace"
 BUILD_LOG="$TEST_ROOT/build.log"
+READLINE_PTY_TESTS="$SCRIPT_DIR/readline_pty_tests.py"
 
 passed=0
 failed=0
@@ -75,12 +77,14 @@ run_shell()
 {
     local name=$1
     local commands=$2
+    local test_home="$TEST_ROOT/home-$name"
     local raw_output="$TEST_ROOT/$name.raw"
     local clean_output="$TEST_ROOT/$name.txt"
+    mkdir -p "$test_home"
 
     (
         cd "$TEST_WORKSPACE" || exit 1
-        "$TEST_BINARY" <<< "$commands"
+        HOME="$test_home" "$TEST_BINARY" <<< "$commands"
     ) >"$raw_output" 2>&1
     RUN_STATUS=$?
 
@@ -140,13 +144,31 @@ assert_line_once()
     fi
 }
 
+assert_file_line_once()
+{
+    local expected=$1
+    local file=$2
+    local matches
+
+    matches=$(grep -Fxc -- "$expected" "$file")
+    if [[ "$matches" -ne 1 ]]; then
+        FAIL_REASON="expected one history file line '$expected', found $matches"
+        return 1
+    fi
+}
+
 test_build()
 {
     if gcc -std=c17 -Wall -Wextra -Wpedantic \
         "$PROJECT_ROOT/omnishell.c" \
         "$PROJECT_ROOT/omnifunc.c" \
+        "$PROJECT_ROOT/omniparser.c" \
+        "$PROJECT_ROOT/omnilauncher.c" \
+        "$PROJECT_ROOT/omnicommands.c" \
         "$PROJECT_ROOT/omnibuiltins.c" \
         "$PROJECT_ROOT/omnirun.c" \
+        "$PROJECT_ROOT/omnireadline.c" \
+        "$PROJECT_ROOT/omnireadline_keybinds.c" \
         -o "$TEST_BINARY" -lreadline 2>"$BUILD_LOG"; then
         if [[ -s "$BUILD_LOG" ]]; then
             printf '%s\n' '--- compiler warnings ---'
@@ -178,8 +200,12 @@ test_create_helper()
     cp "$PROJECT_ROOT/omnicreate.sh" "$bootstrap/"
     cp "$PROJECT_ROOT/omnishell.c" "$PROJECT_ROOT/omnishell.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnifunc.c" "$PROJECT_ROOT/omnifunc.h" "$bootstrap/"
+    cp "$PROJECT_ROOT/omniparser.c" "$PROJECT_ROOT/omniparser.h" "$bootstrap/"
+    cp "$PROJECT_ROOT/omnilauncher.c" "$PROJECT_ROOT/omnilauncher.h" "$bootstrap/"
+    cp "$PROJECT_ROOT/omnicommands.c" "$PROJECT_ROOT/omnicommands.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnibuiltins.c" "$PROJECT_ROOT/omnibuiltins.h" "$bootstrap/"
     cp "$PROJECT_ROOT/omnirun.c" "$PROJECT_ROOT/omnirun.h" "$bootstrap/"
+    cp "$PROJECT_ROOT/omnireadline.c" "$PROJECT_ROOT/omnireadline_keybinds.c" "$PROJECT_ROOT/omnireadline.h" "$bootstrap/"
     cp "$PROJECT_ROOT/welcome_to_omnishell.c" "$bootstrap/"
 
     if ! gcc -std=c17 -Wall -Wextra -Wpedantic \
@@ -261,6 +287,12 @@ test_pwd()
     assert_status 0 && assert_line_present "$TEST_WORKSPACE"
 }
 
+test_echo()
+{
+    run_shell pwd $'echo Hello\nexit'
+    assert_status 0 && assert_contains "Hello"
+}
+
 test_cd_and_pwd()
 {
     run_shell cd_pwd $'cd change-directory\npwd\nexit'
@@ -279,13 +311,98 @@ test_help()
         && assert_contains " history"
 }
 
-test_history()
+test_history_current_session()
 {
-    run_shell history $'pwd\nhelp\nhistory\nexit'
+    run_shell current_history_list $'pwd\nhelp\nhistory\nexit'
     assert_status 0 \
-        && assert_line_once "  1  pwd" \
-        && assert_line_once "  2  help" \
-        && assert_line_once "  3  history"
+        && assert_line_once "  1:  pwd" \
+        && assert_line_once "  2:  help" \
+        && assert_line_once "  3:  history"
+}
+
+test_history_loads_existing_file()
+{
+    local test_home="$TEST_ROOT/home-persistent_history_check"
+    mkdir -p "$test_home"
+    printf '%s\n' \
+        'cat nofile.txt' \
+        'echo noname' \
+        > "$test_home/.omnish_history"
+    run_shell persistent_history_check $'history\nexit'
+    assert_status 0 \
+        && assert_line_once "  1:  cat nofile.txt" \
+        && assert_line_once "  2:  echo noname" \
+        && assert_line_once "  3:  history"
+}
+
+test_history_does_not_dup_load_entries()
+{
+    local test_home="$TEST_ROOT/home-no_duplicated_entries"
+    mkdir -p "$test_home"
+    printf '%s\n' \
+        'ls' \
+        'echo Hello' \
+        > "$test_home/.omnish_history"
+    run_shell no_duplicated_entries $'pwd\nexit'
+    assert_status 0
+    run_shell no_duplicated_entries $'help\nexit'
+    assert_status 0
+    run_shell no_duplicated_entries $'history\nexit'
+    assert_status 0 \
+        && assert_file_line_once "ls" "$test_home/.omnish_history" \
+        && assert_file_line_once "echo Hello" "$test_home/.omnish_history" \
+        && assert_file_line_once "pwd" "$test_home/.omnish_history" \
+        && assert_file_line_once "help" "$test_home/.omnish_history" \
+        && assert_file_line_once "history" "$test_home/.omnish_history"
+}
+
+test_missing_history_file()
+{
+    run_shell missing_history_file $'pwd\nexit'
+    local file="$TEST_ROOT/home-missing_history_file/.omnish_history"
+    if [[ ! -f "$file" || ! -r "$file" ]]; then
+        FAIL_REASON="expected one history file to persist: $file"
+        return 1
+    fi
+    assert_status 0 \
+        && assert_file_line_once "pwd" "$file" \
+        && assert_file_line_once "exit" "$file"
+}
+
+test_history_persists_between_sessions()
+{
+    run_shell same_history_persist $'ls\npwd\nexit'
+    assert_status 0
+    run_shell same_history_persist $'history\nexit'
+    assert_status 0 \
+        && assert_line_once "  1:  ls" \
+        && assert_line_once "  2:  pwd" \
+        && assert_line_once "  3:  exit" \
+        && assert_line_once "  4:  history"
+}
+
+test_history_file_recovery()
+{
+    local test_home="$TEST_ROOT/home-history_file_recovery"
+    local commands
+    printf -v commands \
+        'ls\nrm %s/.omnish_history\nhistory\nexit' \
+        "$test_home"
+    mkdir -p "$test_home"
+    printf '%s\n' \
+        'man ls' \
+        'cd' \
+        > "$test_home/.omnish_history"
+    run_shell history_file_recovery "$commands"
+    assert_status 0 \
+        && assert_file_line_once "ls" "$test_home/.omnish_history" \
+        && assert_file_line_once "rm $test_home/.omnish_history" "$test_home/.omnish_history" \
+        && assert_file_line_once "history" "$test_home/.omnish_history" \
+        && assert_file_line_once "exit" "$test_home/.omnish_history" \
+        && assert_file_line_once "man ls" "$test_home/.omnish_history" \
+        && assert_file_line_once "cd" "$test_home/.omnish_history" \
+        && assert_line_once "  1:  man ls" \
+        && assert_line_once "  2:  cd"
 }
 
 test_history_wrong_usage()
@@ -300,6 +417,48 @@ test_external_command()
 {
     run_shell external $'printf EXTERNAL_TEST_OK\nexit'
     assert_status 0 && assert_contains "EXTERNAL_TEST_OK"
+}
+
+test_single_and_builtin_pipelines()
+{
+    run_shell single_pipeline $'echo BUILTIN_PIPE_OK | grep BUILTIN_PIPE_OK\npwd | cat\nexit'
+    assert_status 0 \
+        && assert_contains "BUILTIN_PIPE_OK" \
+        && assert_contains "$TEST_WORKSPACE"
+}
+
+test_multiple_pipeline()
+{
+    run_shell multiple_pipeline $'printf MULTIPLE_PIPE_OK | cat | cat\nexit'
+    assert_status 0 && assert_contains "MULTIPLE_PIPE_OK"
+}
+
+test_input_output_redirection()
+{
+    run_shell redirection $'echo first > launcher-output.txt\necho second >> launcher-output.txt\ncat < launcher-output.txt\nexit'
+    assert_status 0 \
+        && assert_contains "first" \
+        && assert_contains "second" \
+        && [[ "$(<"$TEST_WORKSPACE/launcher-output.txt")" == $'first\nsecond' ]]
+}
+
+test_pipeline_and_builtin_redirection()
+{
+    run_shell pipeline_redirection $'echo PIPE_FILE_OK | cat > launcher-pipe.txt\npwd > launcher-pwd.txt\ncat launcher-pipe.txt\necho REDIRECTION_RESTORED\nexit'
+    assert_status 0 \
+        && assert_contains "PIPE_FILE_OK" \
+        && assert_contains "REDIRECTION_RESTORED" \
+        && grep -Fq -- "$TEST_WORKSPACE" "$TEST_WORKSPACE/launcher-pwd.txt"
+}
+
+test_malformed_execution_syntax()
+{
+    run_shell malformed_execution $'|\nls |\n| ls\n>\nls >\n>>\ncat <\nls || grep\necho MALFORMED_SURVIVED\nexit'
+    assert_status 0 \
+        && assert_contains "expected a command beside '|'" \
+        && assert_contains "expected a command after '|'" \
+        && assert_contains "redirection requires a filename" \
+        && assert_contains "MALFORMED_SURVIVED"
 }
 
 test_omnirun_python()
@@ -364,6 +523,33 @@ test_missing_source()
         && assert_contains "MISSING_SOURCE_SURVIVED"
 }
 
+# Piped stdin is sufficient for command execution and persistent-history tests,
+# but Readline only exposes real keybinding behavior when attached to a terminal.
+# These cases use a small Python standard-library PTY driver to send the same TAB
+# and arrow-key bytes as a user and assert against the resulting shell behavior.
+run_readline_pty_case()
+{
+    local case_name=$1
+
+    if ! python3 "$READLINE_PTY_TESTS" \
+        "$case_name" \
+        "$TEST_BINARY" \
+        "$TEST_ROOT/readline-$case_name"; then
+        FAIL_REASON="interactive Readline PTY case failed: $case_name"
+        return 1
+    fi
+}
+
+test_readline_command_completion() { run_readline_pty_case command-completion; }
+test_readline_builtin_completion() { run_readline_pty_case builtin-completion; }
+test_readline_ambiguous_completion() { run_readline_pty_case ambiguous-completion; }
+test_readline_duplicate_suppression() { run_readline_pty_case duplicate-suppression; }
+test_readline_empty_buffer_tabs() { run_readline_pty_case empty-buffer-tabs; }
+test_readline_completion_query() { run_readline_pty_case completion-query; }
+test_readline_filename_completion() { run_readline_pty_case filename-completion; }
+test_readline_pathname_completion() { run_readline_pty_case pathname-completion; }
+test_readline_history_prefix_navigation() { run_readline_pty_case history-prefix-navigation; }
+
 # Arrange: create isolated source files used by the black-box OmniRun tests.
 cat >"$TEST_WORKSPACE/python_case.py" <<'PYTHON'
 print("PYTHON_TEST_OK")
@@ -421,11 +607,22 @@ run_test "one-time build helper" test_create_helper
 if [[ -x "$TEST_BINARY" ]]; then
     run_test "shell starts and exits" test_start_and_exit
     run_test "pwd builtin" test_pwd
+    run_test "echo builtin" test_echo
     run_test "cd changes shell directory" test_cd_and_pwd
     run_test "help lists current builtins" test_help
-    run_test "history builtin ordering" test_history
+    run_test "history current session" test_history_current_session
+    run_test "history loads existing file" test_history_loads_existing_file
+    run_test "history avoids duplicate loaded entries" test_history_does_not_dup_load_entries
+    run_test "history creates missing file" test_missing_history_file
+    run_test "history persists between sessions" test_history_persists_between_sessions
+    run_test "history file recovery" test_history_file_recovery
     run_test "history rejects arguments" test_history_wrong_usage
     run_test "external command" test_external_command
+    run_test "single and builtin pipelines" test_single_and_builtin_pipelines
+    run_test "multiple pipeline" test_multiple_pipeline
+    run_test "input and output redirection" test_input_output_redirection
+    run_test "pipeline and builtin redirection" test_pipeline_and_builtin_redirection
+    run_test "malformed execution syntax" test_malformed_execution_syntax
     run_test "omnirun Python" test_omnirun_python
     run_test "omnirun C" test_omnirun_c
     run_test "omnirun C++ through g++ behavior" test_omnirun_cpp
@@ -433,6 +630,15 @@ if [[ -x "$TEST_BINARY" ]]; then
     run_test "failed compilation cleanup and shell survival" test_failed_compilation_cleanup
     run_test "unsupported extension" test_unsupported_extension
     run_test "missing source and shell survival" test_missing_source
+    run_test "Readline completes executable commands" test_readline_command_completion
+    run_test "Readline completes builtins" test_readline_builtin_completion
+    run_test "Readline displays ambiguous matches alphabetically" test_readline_ambiguous_completion
+    run_test "Readline suppresses duplicate PATH matches" test_readline_duplicate_suppression
+    run_test "Readline empty-buffer TAB behavior" test_readline_empty_buffer_tabs
+    run_test "Readline completion query prompt" test_readline_completion_query
+    run_test "Readline filename completion fallback" test_readline_filename_completion
+    run_test "Readline pathname completion fallback" test_readline_pathname_completion
+    run_test "Readline history prefix navigation" test_readline_history_prefix_navigation
 fi
 
 printf '\n%d passed\n%d failed\n' "$passed" "$failed"
