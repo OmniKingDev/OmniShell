@@ -4,7 +4,7 @@ OmniShell is an early Unix-style shell written in C. It combines the normal foun
 
 OmniRun addresses a small annoyance from programming exercises and single-file experiments: repeatedly typing or remembering the interpreter or compiler command. Instead of entering `python3 test.py`, or compiling and then running a C file manually, OmniShell can select the current tool from the file extension.
 
-Version 0.1 established OmniShell's first completed foundation as a systems-programming learning project. The current branch contains development and verification work preparing the project for v0.2; v0.2 has not been formally released. OmniShell is not presented as a replacement for Bash or Zsh, and OmniRun is not a replacement for Make, CMake, Meson, or another build system.
+Version 0.2 established OmniShell's first completed foundation as a systems-programming learning project. The current branch contains development and verification work preparing the project for v0.3; v0.3 has not been formally released. OmniShell is not presented as a replacement for Bash or Zsh, and OmniRun is not a replacement for Make, CMake, Meson, or another build system.
 
 
 #### Video Demo:  https://youtu.be/x0x3imhMWIY
